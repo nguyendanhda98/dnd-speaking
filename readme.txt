@@ -7,27 +7,33 @@ Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Basic plugin for managing speaking session credits and teacher sessions.
+Plugin for managing speaking session credits, sessions history, and logs.
 
 == Description ==
 
-This plugin provides basic management for speaking sessions:
+This plugin provides management for speaking sessions:
 - Track student credits (remaining sessions)
 - Track teacher sessions taught
-- Admin interface to view lists
+- View sessions history with details
+- Logs for all actions
+- Settings for configuration
+- Manual credit addition
 
 == Installation ==
 
 1. Upload the plugin files to the `/wp-content/plugins/dnd-speaking` directory, or install the plugin through the WordPress plugins screen directly.
 2. Activate the plugin through the 'Plugins' screen in WordPress.
-3. Go to DND Speaking menu to view Students and Teachers lists.
+3. Go to DND Speaking menu to manage Students, Teachers, Sessions, Logs, and Settings.
 
 == Usage ==
 
-- Manually add credits to students via database or future features.
-- View teacher session counts.
+- Students: View and manually add credits.
+- Teachers: View session counts.
+- Sessions: Detailed history.
+- Logs: Action tracking.
+- Settings: Configure defaults.
 
 == Changelog ==
 
 = 1.0.0 =
-* Basic functionality: credits and sessions tracking.
+* Full management: credits, sessions, logs, settings.

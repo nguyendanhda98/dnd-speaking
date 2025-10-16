@@ -35,11 +35,25 @@ class DND_Speaking_Activator {
             teacher_id bigint(20) NOT NULL,
             status varchar(50) DEFAULT 'completed',
             start_time datetime DEFAULT CURRENT_TIMESTAMP,
+            end_time datetime DEFAULT NULL,
+            duration int(11) DEFAULT 0,
+            PRIMARY KEY (id)
+        ) $charset_collate;";
+
+        // Table for logs
+        $table_logs = $wpdb->prefix . 'dnd_speaking_logs';
+        $sql_logs = "CREATE TABLE $table_logs (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            user_id bigint(20) NOT NULL,
+            action varchar(255) NOT NULL,
+            details text,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id)
         ) $charset_collate;";
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql_credits);
         dbDelta($sql_sessions);
+        dbDelta($sql_logs);
     }
 }

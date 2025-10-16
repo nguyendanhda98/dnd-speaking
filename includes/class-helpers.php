@@ -33,4 +33,14 @@ class DND_Speaking_Helpers {
         $table = $wpdb->prefix . 'dnd_speaking_sessions';
         return (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE teacher_id = %d", $teacher_id));
     }
+
+    public static function log_action($user_id, $action, $details = '') {
+        global $wpdb;
+        $table = $wpdb->prefix . 'dnd_speaking_logs';
+        $wpdb->insert($table, [
+            'user_id' => $user_id,
+            'action' => $action,
+            'details' => $details
+        ]);
+    }
 }

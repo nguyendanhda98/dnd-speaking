@@ -18,7 +18,8 @@ class DND_Speaking_Deactivator {
         global $wpdb;
         $tables = [
             $wpdb->prefix . 'dnd_speaking_credits',
-            $wpdb->prefix . 'dnd_speaking_sessions'
+            $wpdb->prefix . 'dnd_speaking_sessions',
+            $wpdb->prefix . 'dnd_speaking_logs'
         ];
 
         foreach ($tables as $table) {
