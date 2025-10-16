@@ -1,0 +1,31 @@
+.dnd-student-dashboard, .dnd-teacher-dashboard, .dnd-teacher-list {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.dnd-teacher-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.dnd-teacher-list li {
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 3px;
+}
+
+.button {
+    background: #007cba;
+    color: white;
+    padding: 8px 16px;
+    text-decoration: none;
+    border-radius: 3px;
+}
+
+.button:hover {
+    background: #005a87;
+}
