@@ -56,6 +56,7 @@ class DND_Speaking_Teacher_Status {
     }
 
     public function ajax_toggle_availability() {
+        check_ajax_referer('dnd_nonce', 'nonce');
         if (!is_user_logged_in()) wp_die('Unauthorized');
 
         $user = wp_get_current_user();
@@ -68,6 +69,7 @@ class DND_Speaking_Teacher_Status {
     }
 
     public function ajax_request_booking() {
+        check_ajax_referer('dnd_nonce', 'nonce');
         if (!is_user_logged_in()) wp_die('Unauthorized');
 
         $student_id = get_current_user_id();

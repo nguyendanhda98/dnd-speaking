@@ -24,14 +24,8 @@ class DND_Speaking_Helpers {
     }
 
     public static function deduct_user_credits($user_id, $amount = 1) {
-        global $wpdb;
-        $table = $wpdb->prefix . 'dnd_speaking_credits';
-        $existing = self::get_user_credits($user_id);
-        if ($existing >= $amount) {
-            $wpdb->update($table, ['credits' => $existing - $amount], ['user_id' => $user_id]);
-            return true;
-        }
-        return false;
+        // Temporarily disabled
+        return true;
     }
 
     public static function get_online_teachers() {

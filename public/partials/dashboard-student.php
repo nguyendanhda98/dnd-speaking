@@ -1,5 +1,5 @@
 <?php
-$user_id = bp_displayed_user_id();
+$user_id = get_current_user_id(); // Use current user instead of bp_displayed_user_id
 $credits = DND_Speaking_Helpers::get_user_credits($user_id);
 ?>
 <div class="dnd-student-dashboard">

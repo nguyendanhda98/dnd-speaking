@@ -1,27 +1,7 @@
 // includes/class-student-dashboard.php
 class DND_Speaking_Student_Dashboard {
     public function __construct() {
-        add_action('bp_setup_nav', [$this, 'add_profile_tab']);
         add_shortcode('dnd_student_dashboard', [$this, 'shortcode_dashboard']);
-    }
-
-    public function add_profile_tab() {
-        bp_core_new_nav_item([
-            'name' => __('Speaking Sessions', 'dnd-speaking'),
-            'slug' => 'speaking-sessions',
-            'screen_function' => [$this, 'screen_content'],
-            'position' => 90,
-            'default_subnav_slug' => 'sessions',
-        ]);
-    }
-
-    public function screen_content() {
-        add_action('bp_template_content', [$this, 'load_template']);
-        bp_core_load_template('buddypress/members/single/plugins');
-    }
-
-    public function load_template() {
-        include plugin_dir_path(__FILE__) . '../public/partials/dashboard-student.php';
     }
 
     public function shortcode_dashboard() {

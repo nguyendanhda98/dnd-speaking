@@ -19,11 +19,8 @@ register_deactivation_hook(__FILE__, ['DND_Speaking_Deactivator', 'deactivate'])
 
 // Initialize main plugin
 add_action('plugins_loaded', function() {
-    new DND_Speaking_REST_API();
     new DND_Speaking_Teacher_Status();
-    new DND_Speaking_Session_Manager();
     new DND_Speaking_Student_Dashboard();
-    new DND_Speaking_Payment_Integration();
     new DND_Speaking_Admin();
 });
 
