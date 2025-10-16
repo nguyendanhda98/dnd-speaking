@@ -28,25 +28,9 @@ class DND_Speaking_Helpers {
         return true;
     }
 
-    public static function get_online_teachers() {
-        $args = [
-            'role' => 'teacher',
-            'meta_query' => [
-                [
-                    'key' => 'dnd_available',
-                    'value' => '1',
-                    'compare' => '='
-                ]
-            ]
-        ];
-        return get_users($args);
-    }
-
-    public static function is_teacher_available($teacher_id) {
-        return get_user_meta($teacher_id, 'dnd_available', true) == '1';
-    }
-
-    public static function set_teacher_availability($teacher_id, $available) {
-        update_user_meta($teacher_id, 'dnd_available', $available ? '1' : '0');
+    public static function get_teacher_sessions_count($teacher_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'dnd_speaking_sessions';
+        return (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE teacher_id = %d", $teacher_id));
     }
 }

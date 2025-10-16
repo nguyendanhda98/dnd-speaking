@@ -8,10 +8,6 @@
 class DND_Speaking_Deactivator {
 
     public static function deactivate() {
-        // Remove custom roles
-        remove_role('teacher');
-        remove_role('student');
-
         // Optionally drop tables (commented out for safety)
         // self::drop_database_tables();
 
@@ -22,8 +18,7 @@ class DND_Speaking_Deactivator {
         global $wpdb;
         $tables = [
             $wpdb->prefix . 'dnd_speaking_credits',
-            $wpdb->prefix . 'dnd_speaking_sessions',
-            $wpdb->prefix . 'dnd_speaking_bookings'
+            $wpdb->prefix . 'dnd_speaking_sessions'
         ];
 
         foreach ($tables as $table) {

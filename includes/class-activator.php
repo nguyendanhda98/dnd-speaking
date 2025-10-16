@@ -8,23 +8,8 @@
 class DND_Speaking_Activator {
 
     public static function activate() {
-        self::create_user_roles();
         self::create_database_tables();
         flush_rewrite_rules();
-    }
-
-    private static function create_user_roles() {
-        add_role('teacher', __('Teacher', 'dnd-speaking'), [
-            'read' => true,
-            'edit_posts' => false,
-            'delete_posts' => false,
-        ]);
-
-        add_role('student', __('Student', 'dnd-speaking'), [
-            'read' => true,
-            'edit_posts' => false,
-            'delete_posts' => false,
-        ]);
     }
 
     private static function create_database_tables() {
@@ -48,29 +33,13 @@ class DND_Speaking_Activator {
             id mediumint(9) NOT NULL AUTO_INCREMENT,
             student_id bigint(20) NOT NULL,
             teacher_id bigint(20) NOT NULL,
-            discord_channel_id varchar(255) DEFAULT '',
-            status varchar(50) DEFAULT 'pending',
+            status varchar(50) DEFAULT 'completed',
             start_time datetime DEFAULT CURRENT_TIMESTAMP,
-            end_time datetime DEFAULT NULL,
-            credits_used int(11) DEFAULT 1,
-            PRIMARY KEY (id)
-        ) $charset_collate;";
-
-        // Table for bookings
-        $table_bookings = $wpdb->prefix . 'dnd_speaking_bookings';
-        $sql_bookings = "CREATE TABLE $table_bookings (
-            id mediumint(9) NOT NULL AUTO_INCREMENT,
-            student_id bigint(20) NOT NULL,
-            teacher_id bigint(20) NOT NULL,
-            status varchar(50) DEFAULT 'pending',
-            requested_time datetime DEFAULT CURRENT_TIMESTAMP,
-            approved_time datetime DEFAULT NULL,
             PRIMARY KEY (id)
         ) $charset_collate;";
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql_credits);
         dbDelta($sql_sessions);
-        dbDelta($sql_bookings);
     }
 }
