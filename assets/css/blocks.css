@@ -1,0 +1,36 @@
+.dnd-student-credits {
+    padding: 10px;
+    border: 1px solid #ddd;
+    background: #f9f9f9;
+    text-align: center;
+}
+
+.dnd-teachers-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.dnd-teachers-list li {
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.book-now, .start-now {
+    padding: 5px 10px;
+    border: none;
+    cursor: pointer;
+}
+
+.book-now {
+    background: #007cba;
+    color: white;
+}
+
+.start-now {
+    background: #28a745;
+    color: white;
+}

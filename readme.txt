@@ -32,6 +32,12 @@ This plugin provides management for speaking sessions:
 - Sessions: Detailed history.
 - Logs: Action tracking.
 - Settings: Configure defaults.
+- Blocks: Use Gutenberg blocks for frontend display.
+
+== Blocks ==
+
+- Student Credits: Displays remaining credits for logged-in user.
+- Teachers List: Shows teachers with Book Now and Start Now buttons.
 
 == Changelog ==
 
