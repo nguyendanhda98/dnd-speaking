@@ -9,6 +9,10 @@ class DND_Speaking_Admin {
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_post_add_credits', [$this, 'handle_add_credits']);
+        add_action('wp_ajax_update_teacher_availability', [$this, 'update_teacher_availability']);
+        add_action('wp_ajax_handle_teacher_request', [$this, 'handle_teacher_request']);
+        add_action('wp_ajax_handle_upcoming_session', [$this, 'handle_upcoming_session']);
+        add_action('wp_ajax_save_teacher_schedule', [$this, 'save_teacher_schedule']);
     }
 
     public function add_admin_menu() {
@@ -132,25 +136,40 @@ class DND_Speaking_Admin {
     public function teachers_page() {
         global $wpdb;
         $table_sessions = $wpdb->prefix . 'dnd_speaking_sessions';
-        $teachers = $wpdb->get_results("SELECT teacher_id, COUNT(*) as sessions FROM $table_sessions GROUP BY teacher_id ORDER BY sessions DESC");
+        $teacher_role = get_option('dnd_teacher_role', 'teacher');
+        
+        // Get all users with teacher role
+        $users = get_users(['role' => $teacher_role]);
+        
+        // Get session counts for each teacher
+        $session_counts = $wpdb->get_results("SELECT teacher_id, COUNT(*) as sessions FROM $table_sessions GROUP BY teacher_id", ARRAY_A);
+        $session_count_map = [];
+        foreach ($session_counts as $count) {
+            $session_count_map[$count['teacher_id']] = $count['sessions'];
+        }
 
         ?>
         <div class="wrap">
-            <h1>Teachers</h1>
+            <h1>Teachers (Role: <?php echo esc_html(wp_roles()->get_names()[$teacher_role] ?? $teacher_role); ?>)</h1>
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
                         <th>User ID</th>
                         <th>Name</th>
                         <th>Sessions Taught</th>
+                        <th>Available</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($teachers as $teacher): ?>
+                    <?php foreach ($users as $user): 
+                        $sessions = $session_count_map[$user->ID] ?? 0;
+                        $available = get_user_meta($user->ID, 'dnd_available', true) == '1';
+                    ?>
                         <tr>
-                            <td><?php echo $teacher->teacher_id; ?></td>
-                            <td><?php echo get_user_by('id', $teacher->teacher_id)->display_name; ?></td>
-                            <td><?php echo $teacher->sessions; ?></td>
+                            <td><?php echo $user->ID; ?></td>
+                            <td><?php echo esc_html($user->display_name); ?></td>
+                            <td><?php echo $sessions; ?></td>
+                            <td><?php echo $available ? 'Yes' : 'No'; ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -249,6 +268,7 @@ class DND_Speaking_Admin {
     public function register_settings() {
         register_setting('dnd_speaking_settings', 'dnd_session_duration');
         register_setting('dnd_speaking_settings', 'dnd_default_credits');
+        register_setting('dnd_speaking_settings', 'dnd_teacher_role');
 
         add_settings_section(
             'dnd_speaking_main',
@@ -272,6 +292,14 @@ class DND_Speaking_Admin {
             'dnd_speaking_settings',
             'dnd_speaking_main'
         );
+
+        add_settings_field(
+            'teacher_role',
+            'Teacher Role',
+            [$this, 'teacher_role_field'],
+            'dnd_speaking_settings',
+            'dnd_speaking_main'
+        );
     }
 
     public function session_duration_field() {
@@ -284,18 +312,208 @@ class DND_Speaking_Admin {
         echo '<input type="number" name="dnd_default_credits" value="' . esc_attr($value) . '" />';
     }
 
-    public function handle_add_credits() {
-        if (!wp_verify_nonce($_POST['_wpnonce'], 'add_credits_nonce')) {
+    public function teacher_role_field() {
+        $value = get_option('dnd_teacher_role', 'teacher');
+        $roles = wp_roles()->roles;
+        
+        echo '<select name="dnd_teacher_role">';
+        foreach ($roles as $role_key => $role) {
+            $selected = ($value === $role_key) ? 'selected' : '';
+            echo '<option value="' . esc_attr($role_key) . '" ' . $selected . '>' . esc_html($role['name']) . '</option>';
+        }
+        echo '</select>';
+        echo '<p class="description">Select which WordPress role should be considered as teachers.</p>';
+    }
+
+    public function update_teacher_availability() {
+        // Check nonce for security
+        if (!wp_verify_nonce($_POST['nonce'], 'update_teacher_availability_nonce')) {
             wp_die('Security check failed');
         }
 
         $user_id = intval($_POST['user_id']);
-        $credits = intval($_POST['credits']);
+        $available = intval($_POST['available']);
 
-        DND_Speaking_Helpers::add_user_credits($user_id, $credits);
-        DND_Speaking_Helpers::log_action(get_current_user_id(), 'add_credits', "Added $credits credits to user $user_id");
+        // Only allow users to update their own availability
+        if ($user_id !== get_current_user_id()) {
+            wp_die('Unauthorized');
+        }
 
-        wp_redirect(admin_url('admin.php?page=dnd-speaking-students&added=1'));
-        exit;
+        update_user_meta($user_id, 'dnd_available', $available);
+
+        wp_send_json_success(['available' => $available]);
+    }
+
+    public function handle_teacher_request() {
+        // Check nonce for security
+        if (!wp_verify_nonce($_POST['nonce'], 'teacher_requests_nonce')) {
+            wp_send_json_error('Security check failed');
+        }
+
+        $session_id = intval($_POST['session_id']);
+        $action = sanitize_text_field($_POST['request_action']);
+        $teacher_id = get_current_user_id();
+
+        // Validate action
+        if (!in_array($action, ['accept', 'decline'])) {
+            wp_send_json_error('Invalid action');
+        }
+
+        global $wpdb;
+        $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
+
+        // Get the session and verify it belongs to this teacher
+        $session = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $sessions_table WHERE id = %d AND teacher_id = %d AND status = 'pending'",
+            $session_id, $teacher_id
+        ));
+
+        if (!$session) {
+            wp_send_json_error('Session not found or already processed');
+        }
+
+        // Update session status
+        $new_status = ($action === 'accept') ? 'confirmed' : 'declined';
+
+        $result = $wpdb->update(
+            $sessions_table,
+            ['status' => $new_status, 'updated_at' => current_time('mysql')],
+            ['id' => $session_id],
+            ['%s', '%s'],
+            ['%d']
+        );
+
+        if ($result === false) {
+            wp_send_json_error('Failed to update session');
+        }
+
+        // If declined, we might want to refund credits or notify the student
+        if ($action === 'decline') {
+            // Optionally refund credits to student
+            // This would depend on your business logic
+        }
+
+        wp_send_json_success(['status' => $new_status]);
+    }
+
+    public function handle_upcoming_session() {
+        // Check nonce for security
+        if (!wp_verify_nonce($_POST['nonce'], 'upcoming_sessions_nonce')) {
+            wp_send_json_error('Security check failed');
+        }
+
+        $session_id = intval($_POST['session_id']);
+        $action = sanitize_text_field($_POST['session_action']);
+        $teacher_id = get_current_user_id();
+
+        // Validate action
+        if (!in_array($action, ['start', 'cancel'])) {
+            wp_send_json_error('Invalid action');
+        }
+
+        global $wpdb;
+        $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
+
+        // Get the session and verify it belongs to this teacher
+        $session = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $sessions_table WHERE id = %d AND teacher_id = %d AND status = 'confirmed'",
+            $session_id, $teacher_id
+        ));
+
+        if (!$session) {
+            wp_send_json_error('Session not found or not confirmed');
+        }
+
+        if ($action === 'start') {
+            // Update session status to 'in_progress'
+            $result = $wpdb->update(
+                $sessions_table,
+                ['status' => 'in_progress', 'updated_at' => current_time('mysql')],
+                ['id' => $session_id],
+                ['%s', '%s'],
+                ['%d']
+            );
+
+            if ($result === false) {
+                wp_send_json_error('Failed to start session');
+            }
+
+            wp_send_json_success(['status' => 'in_progress', 'action' => 'started']);
+
+        } elseif ($action === 'cancel') {
+            // Update session status to 'cancelled'
+            $result = $wpdb->update(
+                $sessions_table,
+                ['status' => 'cancelled', 'updated_at' => current_time('mysql')],
+                ['id' => $session_id],
+                ['%s', '%s'],
+                ['%d']
+            );
+
+            if ($result === false) {
+                wp_send_json_error('Failed to cancel session');
+            }
+
+            // Optionally refund credits to student
+            // This would depend on your business logic
+
+            wp_send_json_success(['status' => 'cancelled', 'action' => 'cancelled']);
+        }
+    }
+
+    public function save_teacher_schedule() {
+        // Check nonce for security
+        if (!wp_verify_nonce($_POST['nonce'], 'schedule_settings_nonce')) {
+            wp_send_json_error('Security check failed');
+        }
+
+        $user_id = get_current_user_id();
+        $schedule_data = json_decode(stripslashes($_POST['schedule_data']), true);
+
+        // Validate schedule data
+        if (!$schedule_data || !is_array($schedule_data)) {
+            wp_send_json_error('Invalid schedule data');
+        }
+
+        // Validate each day's data
+        $valid_days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $validated_schedule = [];
+
+        foreach ($valid_days as $day) {
+            if (isset($schedule_data[$day])) {
+                $day_data = $schedule_data[$day];
+
+                // Validate time format (HH:MM)
+                $start_time = isset($day_data['start']) ? $day_data['start'] : '09:00';
+                $end_time = isset($day_data['end']) ? $day_data['end'] : '17:00';
+
+                if (!preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $start_time) ||
+                    !preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $end_time)) {
+                    wp_send_json_error('Invalid time format');
+                }
+
+                $validated_schedule[$day] = [
+                    'enabled' => isset($day_data['enabled']) ? (bool)$day_data['enabled'] : false,
+                    'start' => $start_time,
+                    'end' => $end_time
+                ];
+            } else {
+                // Default values for missing days
+                $validated_schedule[$day] = [
+                    'enabled' => false,
+                    'start' => '09:00',
+                    'end' => '17:00'
+                ];
+            }
+        }
+
+        // Save to user meta
+        $result = update_user_meta($user_id, 'dnd_weekly_schedule', $validated_schedule);
+
+        if ($result === false) {
+            wp_send_json_error('Failed to save schedule');
+        }
+
+        wp_send_json_success(['message' => 'Schedule saved successfully']);
     }
 }

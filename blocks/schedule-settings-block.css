@@ -1,0 +1,169 @@
+/* Schedule Settings Block Styles */
+
+.dnd-schedule-settings {
+    background: #fff;
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.dnd-schedule-settings h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.dnd-day-setting {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.dnd-day-toggle {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+
+.dnd-day-toggle input[type="checkbox"] {
+    display: none;
+}
+
+.dnd-toggle-slider {
+    position: relative;
+    width: 50px;
+    height: 24px;
+    background: #ccc;
+    border-radius: 24px;
+    margin-right: 12px;
+    transition: background 0.3s ease;
+}
+
+.dnd-toggle-slider:before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+}
+
+.dnd-day-toggle input:checked + .dnd-toggle-slider {
+    background: #28a745;
+}
+
+.dnd-day-toggle input:checked + .dnd-toggle-slider:before {
+    transform: translateX(26px);
+}
+
+.dnd-day-name {
+    font-weight: 600;
+    color: #333;
+    flex: 1;
+}
+
+.dnd-time-settings {
+    margin-left: 62px;
+    padding-top: 10px;
+}
+
+.dnd-time-inputs {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.dnd-time-inputs label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+}
+
+.dnd-time-inputs input[type="time"] {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.dnd-form-actions {
+    margin-top: 30px;
+    text-align: center;
+}
+
+.dnd-btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.dnd-btn-save {
+    background: #007cba;
+    color: white;
+}
+
+.dnd-btn-save:hover {
+    background: #005a87;
+}
+
+.dnd-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#dnd-schedule-message {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.dnd-schedule-message {
+    padding: 10px 15px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.dnd-schedule-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.dnd-schedule-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .dnd-time-inputs {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .dnd-time-settings {
+        margin-left: 0;
+        padding-left: 62px;
+    }
+
+    .dnd-day-setting {
+        padding: 12px;
+    }
+}

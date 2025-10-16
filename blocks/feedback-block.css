@@ -1,0 +1,164 @@
+/* Feedback Block Styles */
+
+.dnd-feedback {
+    background: #fff;
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.dnd-feedback h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.dnd-no-feedback {
+    text-align: center;
+    color: #666;
+    padding: 40px 20px;
+    font-style: italic;
+}
+
+.dnd-feedback-summary {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 6px;
+    margin-bottom: 25px;
+    text-align: center;
+}
+
+.dnd-average-rating {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.dnd-rating-number {
+    font-size: 36px;
+    font-weight: 700;
+    color: #333;
+}
+
+.dnd-rating-stars {
+    font-size: 24px;
+    color: #ffc107;
+}
+
+.dnd-rating-count {
+    color: #666;
+    font-size: 14px;
+}
+
+.dnd-feedback-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.dnd-feedback-item {
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 15px;
+    background: #fafbfc;
+    transition: all 0.2s ease;
+}
+
+.dnd-feedback-item:hover {
+    border-color: #dadce0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dnd-feedback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.dnd-student-name {
+    font-weight: 600;
+    color: #333;
+    font-size: 16px;
+}
+
+.dnd-feedback-date {
+    color: #666;
+    font-size: 14px;
+}
+
+.dnd-feedback-rating {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 18px;
+    color: #ffc107;
+}
+
+.dnd-rating-text {
+    color: #666;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.dnd-feedback-content {
+    color: #495057;
+    line-height: 1.5;
+}
+
+.dnd-feedback-content p {
+    margin: 0;
+    font-size: 15px;
+}
+
+/* Star styling */
+.dnd-rating-stars,
+.dnd-feedback-rating {
+    font-family: 'Arial', sans-serif;
+    letter-spacing: 2px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .dnd-feedback-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+
+    .dnd-feedback-summary {
+        padding: 15px;
+    }
+
+    .dnd-rating-number {
+        font-size: 28px;
+    }
+
+    .dnd-rating-stars {
+        font-size: 20px;
+    }
+
+    .dnd-feedback-rating {
+        font-size: 16px;
+    }
+}
+
+/* Animation for new feedback (optional) */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dnd-feedback-item {
+    animation: fadeInUp 0.3s ease-out;
+}
