@@ -306,23 +306,28 @@ class DND_Speaking_REST_API {
                     $day_num = $day_mapping[$day_key];
                     $available_days[] = $day_num;
                     
-                    // Store schedule for this day
-                    $day_schedules[$day_num] = [
-                        'start' => isset($day_data['start']) ? $day_data['start'] : '09:00',
-                        'end' => isset($day_data['end']) ? $day_data['end'] : '17:00'
-                    ];
+                    // Store schedule for this day - handle both old format (start/end) and new format (time_slots)
+                    if (isset($day_data['time_slots']) && is_array($day_data['time_slots'])) {
+                        $day_schedules[$day_num] = $day_data['time_slots'];
+                    } elseif (isset($day_data['start']) && isset($day_data['end'])) {
+                        // Backward compatibility for old format
+                        $day_schedules[$day_num] = [
+                            ['start' => $day_data['start'], 'end' => $day_data['end']]
+                        ];
+                    } else {
+                        // Default fallback
+                        $day_schedules[$day_num] = [
+                            ['start' => '09:00', 'end' => '17:00']
+                        ];
+                    }
                 }
             }
         }
         
         
         if (empty($available_days)) {
-            // Default: all days Monday to Sunday if no schedule set
-            $available_days = [1, 2, 3, 4, 5, 6, 7];
-            // Default schedule for all days
-            for ($i = 1; $i <= 7; $i++) {
-                $day_schedules[$i] = ['start' => '09:00', 'end' => '17:00'];
-            }
+            // If no schedule is set, teacher has no availability - return empty array
+            return new WP_REST_Response([], 200);
         }
 
         // Get booked sessions for this teacher in the next week
@@ -352,10 +357,17 @@ class DND_Speaking_REST_API {
             // Check if teacher is available on this day
             if (in_array($day_of_week, $available_days)) {
                 
-                // Get schedule for this day
-                $day_schedule = isset($day_schedules[$day_of_week]) ? $day_schedules[$day_of_week] : ['start' => '09:00', 'end' => '17:00'];
-                $day_start_time = strtotime(date('Y-m-d', $current_date) . " {$day_schedule['start']}:00");
-                $day_end_time = strtotime(date('Y-m-d', $current_date) . " {$day_schedule['end']}:00");
+                // Get schedule for this day - now it's an array of time slots
+                $day_time_slots = isset($day_schedules[$day_of_week]) ? $day_schedules[$day_of_week] : [['start' => '09:00', 'end' => '17:00']];
+                
+                // Loop through each time slot for this day
+                foreach ($day_time_slots as $time_slot) {
+                    if (!isset($time_slot['start']) || !isset($time_slot['end'])) {
+                        continue; // Skip invalid slots
+                    }
+                    
+                    $day_start_time = strtotime(date('Y-m-d', $current_date) . " {$time_slot['start']}:00");
+                    $day_end_time = strtotime(date('Y-m-d', $current_date) . " {$time_slot['end']}:00");
                 
                 // Sessions can be booked up to 30 minutes before end time
                 $bookable_end_time = strtotime('-30 minutes', $day_end_time);
@@ -387,6 +399,7 @@ class DND_Speaking_REST_API {
                     }
                     $current_time = strtotime('+30 minutes', $current_time);
                 }
+                } // End foreach time slot
             }
             $current_date = strtotime('+1 day', $current_date);
         }

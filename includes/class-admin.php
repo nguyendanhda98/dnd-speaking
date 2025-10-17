@@ -527,26 +527,59 @@ class DND_Speaking_Admin {
             if (isset($schedule_data[$day])) {
                 $day_data = $schedule_data[$day];
 
-                // Validate time format (HH:MM)
-                $start_time = isset($day_data['start']) ? $day_data['start'] : '09:00';
-                $end_time = isset($day_data['end']) ? $day_data['end'] : '17:00';
-
-                if (!preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $start_time) ||
-                    !preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $end_time)) {
-                    wp_send_json_error('Invalid time format');
-                }
-
                 $validated_schedule[$day] = [
                     'enabled' => isset($day_data['enabled']) ? (bool)$day_data['enabled'] : false,
-                    'start' => $start_time,
-                    'end' => $end_time
+                    'time_slots' => []
                 ];
+
+                if ($validated_schedule[$day]['enabled'] && isset($day_data['time_slots']) && is_array($day_data['time_slots'])) {
+                    foreach ($day_data['time_slots'] as $slot) {
+                        if (isset($slot['start']) && isset($slot['end'])) {
+                            $start_time = $slot['start'];
+                            $end_time = $slot['end'];
+
+                            // Validate time format (HH:MM)
+                            if (!preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $start_time) ||
+                                !preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $end_time)) {
+                                wp_send_json_error('Invalid time format');
+                            }
+
+                            // Validate that start is before end
+                            if (strtotime($start_time) >= strtotime($end_time)) {
+                                wp_send_json_error('Start time must be before end time');
+                            }
+
+                            $validated_schedule[$day]['time_slots'][] = [
+                                'start' => $start_time,
+                                'end' => $end_time
+                            ];
+                        }
+                    }
+
+                    // Sort time slots by start time
+                    usort($validated_schedule[$day]['time_slots'], function($a, $b) {
+                        return strtotime($a['start']) - strtotime($b['start']);
+                    });
+
+                    // Ensure at least one time slot if enabled
+                    if (empty($validated_schedule[$day]['time_slots'])) {
+                        $validated_schedule[$day]['time_slots'][] = [
+                            'start' => '09:00',
+                            'end' => '17:00'
+                        ];
+                    }
+                } else {
+                    // Default time slot for disabled or missing days
+                    $validated_schedule[$day]['time_slots'][] = [
+                        'start' => '09:00',
+                        'end' => '17:00'
+                    ];
+                }
             } else {
                 // Default values for missing days
                 $validated_schedule[$day] = [
                     'enabled' => false,
-                    'start' => '09:00',
-                    'end' => '17:00'
+                    'time_slots' => [['start' => '09:00', 'end' => '17:00']]
                 ];
             }
         }

@@ -23,6 +23,17 @@
     border: 1px solid #e9ecef;
 }
 
+.dnd-day-setting.dnd-today {
+    background: #e3f2fd;
+    border-color: #2196f3;
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.1);
+}
+
+.dnd-day-setting.dnd-today .dnd-day-name {
+    color: #1976d2;
+    font-weight: 700;
+}
+
 .dnd-day-toggle {
     display: flex;
     align-items: center;
@@ -75,9 +86,22 @@
     padding-top: 10px;
 }
 
+.dnd-time-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dnd-time-slot {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 10px;
+}
+
 .dnd-time-inputs {
     display: flex;
-    gap: 20px;
+    gap: 15px;
     align-items: center;
 }
 
@@ -95,6 +119,37 @@
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 14px;
+}
+
+.dnd-remove-slot {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 10px;
+}
+
+.dnd-remove-slot:hover {
+    background: #c82333;
+}
+
+.dnd-add-slot {
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 10px;
+    align-self: flex-start;
+}
+
+.dnd-add-slot:hover {
+    background: #218838;
 }
 
 .dnd-form-actions {
@@ -165,5 +220,16 @@
 
     .dnd-day-setting {
         padding: 12px;
+    }
+
+    .dnd-remove-slot {
+        margin-left: 0;
+        margin-top: 10px;
+        align-self: flex-start;
+    }
+
+    .dnd-add-slot {
+        font-size: 12px;
+        padding: 6px 12px;
     }
 }

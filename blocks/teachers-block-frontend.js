@@ -146,7 +146,7 @@ jQuery(document).ready(function($) {
 
     function renderAvailabilitySlots(slots, teacherId) {
         if (slots.length === 0) {
-            $('#dnd-availability-slots').html('<p>No available slots in the next week.</p>');
+            $('#dnd-availability-slots').html('<p>Teacher has not set their availability schedule yet.</p>');
             return;
         }
 

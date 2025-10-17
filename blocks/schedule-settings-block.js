@@ -48,26 +48,67 @@
                             className: 'dnd-time-settings'
                         }, [
                             el('div', {
-                                key: 'inputs',
-                                className: 'dnd-time-inputs'
+                                key: 'slots',
+                                className: 'dnd-time-slots'
                             }, [
-                                el('label', { key: 'start' }, [
-                                    'Start: ',
-                                    el('input', {
-                                        key: 'start-input',
-                                        type: 'time',
-                                        defaultValue: '09:00'
-                                    })
+                                el('div', {
+                                    key: 'slot1',
+                                    className: 'dnd-time-slot'
+                                }, [
+                                    el('div', {
+                                        key: 'inputs1',
+                                        className: 'dnd-time-inputs'
+                                    }, [
+                                        el('label', { key: 'start1' }, [
+                                            'Start: ',
+                                            el('input', {
+                                                key: 'start-input1',
+                                                type: 'time',
+                                                defaultValue: '09:00'
+                                            })
+                                        ]),
+                                        el('label', { key: 'end1' }, [
+                                            'End: ',
+                                            el('input', {
+                                                key: 'end-input1',
+                                                type: 'time',
+                                                defaultValue: '12:00'
+                                            })
+                                        ])
+                                    ])
                                 ]),
-                                el('label', { key: 'end' }, [
-                                    'End: ',
-                                    el('input', {
-                                        key: 'end-input',
-                                        type: 'time',
-                                        defaultValue: '17:00'
-                                    })
+                                el('div', {
+                                    key: 'slot2',
+                                    className: 'dnd-time-slot'
+                                }, [
+                                    el('div', {
+                                        key: 'inputs2',
+                                        className: 'dnd-time-inputs'
+                                    }, [
+                                        el('label', { key: 'start2' }, [
+                                            'Start: ',
+                                            el('input', {
+                                                key: 'start-input2',
+                                                type: 'time',
+                                                defaultValue: '14:00'
+                                            })
+                                        ]),
+                                        el('label', { key: 'end2' }, [
+                                            'End: ',
+                                            el('input', {
+                                                key: 'end-input2',
+                                                type: 'time',
+                                                defaultValue: '18:00'
+                                            })
+                                        ])
+                                    ])
                                 ])
-                            ])
+                            ]),
+                            el('button', {
+                                key: 'add-slot',
+                                className: 'dnd-add-slot',
+                                type: 'button'
+                            }, 'Add Time Slot')
                         ])
                     ]),
                     el('div', {
@@ -98,26 +139,41 @@
                             style: { display: 'none' }
                         }, [
                             el('div', {
-                                key: 'inputs',
-                                className: 'dnd-time-inputs'
+                                key: 'slots',
+                                className: 'dnd-time-slots'
                             }, [
-                                el('label', { key: 'start' }, [
-                                    'Start: ',
-                                    el('input', {
-                                        key: 'start-input',
-                                        type: 'time',
-                                        defaultValue: '09:00'
-                                    })
-                                ]),
-                                el('label', { key: 'end' }, [
-                                    'End: ',
-                                    el('input', {
-                                        key: 'end-input',
-                                        type: 'time',
-                                        defaultValue: '17:00'
-                                    })
+                                el('div', {
+                                    key: 'slot1',
+                                    className: 'dnd-time-slot'
+                                }, [
+                                    el('div', {
+                                        key: 'inputs1',
+                                        className: 'dnd-time-inputs'
+                                    }, [
+                                        el('label', { key: 'start1' }, [
+                                            'Start: ',
+                                            el('input', {
+                                                key: 'start-input1',
+                                                type: 'time',
+                                                defaultValue: '09:00'
+                                            })
+                                        ]),
+                                        el('label', { key: 'end1' }, [
+                                            'End: ',
+                                            el('input', {
+                                                key: 'end-input1',
+                                                type: 'time',
+                                                defaultValue: '17:00'
+                                            })
+                                        ])
+                                    ])
                                 ])
-                            ])
+                            ]),
+                            el('button', {
+                                key: 'add-slot',
+                                className: 'dnd-add-slot',
+                                type: 'button'
+                            }, 'Add Time Slot')
                         ])
                     ]),
                     el('div', {
