@@ -25,6 +25,9 @@ jQuery(document).ready(function($) {
     $.ajax({
         url: dnd_speaking_data.rest_url + 'teachers',
         method: 'GET',
+        headers: {
+            'X-WP-Nonce': dnd_speaking_data.nonce
+        },
         success: function(teachers) {
             console.log('Teachers loaded:', teachers); // Debug log
             renderTeachers(teachers);
@@ -127,6 +130,9 @@ jQuery(document).ready(function($) {
         $.ajax({
             url: dnd_speaking_data.rest_url + 'teacher-availability/' + teacherId,
             method: 'GET',
+            headers: {
+                'X-WP-Nonce': dnd_speaking_data.nonce
+            },
             success: function(slots) {
                 renderAvailabilitySlots(slots, teacherId);
             },
@@ -194,6 +200,9 @@ jQuery(document).ready(function($) {
         $.ajax({
             url: dnd_speaking_data.rest_url + 'book-session',
             method: 'POST',
+            headers: {
+                'X-WP-Nonce': dnd_speaking_data.nonce
+            },
             data: {
                 student_id: studentId,
                 teacher_id: teacherId,

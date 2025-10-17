@@ -57,6 +57,7 @@ class DND_Speaking_Teachers_Block {
                 'user_id' => get_current_user_id(),
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'rest_url' => rest_url('dnd-speaking/v1/'),
+                'nonce' => wp_create_nonce('wp_rest'),
             ]);
         }
     }
