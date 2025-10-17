@@ -212,6 +212,39 @@ class DND_Speaking_REST_API {
             return new WP_Error('invalid_time', 'Cannot book sessions more than 1 week in advance', ['status' => 400]);
         }
 
+        // Validate that the slot is within teacher's available schedule
+        $slot_day_of_week = date('N', $start_timestamp); // 1=Monday, 7=Sunday
+        $slot_time = date('H:i', $start_timestamp);
+        
+        $weekly_schedule = get_user_meta($teacher_id, 'dnd_weekly_schedule', true);
+        $is_valid_slot = false;
+        
+        if ($weekly_schedule && is_array($weekly_schedule)) {
+            $day_names = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            $day_key = isset($day_names[$slot_day_of_week - 1]) ? $day_names[$slot_day_of_week - 1] : null;
+            
+            if ($day_key && isset($weekly_schedule[$day_key]) && $weekly_schedule[$day_key]['enabled']) {
+                $day_start = strtotime($weekly_schedule[$day_key]['start']);
+                $day_end = strtotime($weekly_schedule[$day_key]['end']);
+                $slot_timestamp = strtotime($slot_time);
+                
+                // Check if slot is within available time and at least 30 minutes before end
+                if ($slot_timestamp >= $day_start && $slot_timestamp <= strtotime('-30 minutes', $day_end)) {
+                    $is_valid_slot = true;
+                }
+            }
+        } else {
+            // Default schedule: 9 AM to 5 PM
+            $slot_hour = intval(date('H', $start_timestamp));
+            if ($slot_hour >= 9 && $slot_hour < 17) {
+                $is_valid_slot = true;
+            }
+        }
+        
+        if (!$is_valid_slot) {
+            return new WP_Error('invalid_slot', 'This time slot is not available for booking', ['status' => 400]);
+        }
+
         // Check if slot is still available
         global $wpdb;
         $table = $wpdb->prefix . 'dnd_speaking_sessions';
@@ -255,6 +288,7 @@ class DND_Speaking_REST_API {
         // Get teacher's available days from weekly schedule (1=Monday, 7=Sunday)
         $weekly_schedule = get_user_meta($teacher_id, 'dnd_weekly_schedule', true);
         $available_days = [];
+        $day_schedules = [];
         
         if ($weekly_schedule && is_array($weekly_schedule)) {
             $day_mapping = [
@@ -269,18 +303,30 @@ class DND_Speaking_REST_API {
             
             foreach ($weekly_schedule as $day_key => $day_data) {
                 if (isset($day_data['enabled']) && $day_data['enabled'] && isset($day_mapping[$day_key])) {
-                    $available_days[] = $day_mapping[$day_key];
+                    $day_num = $day_mapping[$day_key];
+                    $available_days[] = $day_num;
+                    
+                    // Store schedule for this day
+                    $day_schedules[$day_num] = [
+                        'start' => isset($day_data['start']) ? $day_data['start'] : '09:00',
+                        'end' => isset($day_data['end']) ? $day_data['end'] : '17:00'
+                    ];
                 }
             }
         }
         
         error_log("DEBUG: Weekly schedule for teacher $teacher_id: " . print_r($weekly_schedule, true));
         error_log("DEBUG: Available days for teacher $teacher_id: " . print_r($available_days, true));
+        error_log("DEBUG: Day schedules for teacher $teacher_id: " . print_r($day_schedules, true));
         
         if (empty($available_days)) {
             // Default: all days Monday to Sunday if no schedule set
             $available_days = [1, 2, 3, 4, 5, 6, 7];
-            error_log("DEBUG: Using default available days for teacher $teacher_id");
+            // Default schedule for all days
+            for ($i = 1; $i <= 7; $i++) {
+                $day_schedules[$i] = ['start' => '09:00', 'end' => '17:00'];
+            }
+            error_log("DEBUG: Using default available days and schedules for teacher $teacher_id");
         }
 
         // Get booked sessions for this teacher in the next week
@@ -310,11 +356,22 @@ class DND_Speaking_REST_API {
             // Check if teacher is available on this day
             if (in_array($day_of_week, $available_days)) {
                 error_log("DEBUG: Processing available day $day_of_week for teacher $teacher_id on " . date('Y-m-d', $current_date));
-                // Start from 9 AM or current time if today
-                $start_hour = ($current_date == strtotime($start_date)) ? max(9, intval(date('H', $now))) : 9;
-                $start_minute = ($current_date == strtotime($start_date) && $start_hour == intval(date('H', $now))) ? intval(date('i', $now)) : 0;
+                
+                // Get schedule for this day
+                $day_schedule = isset($day_schedules[$day_of_week]) ? $day_schedules[$day_of_week] : ['start' => '09:00', 'end' => '17:00'];
+                $day_start_time = strtotime(date('Y-m-d', $current_date) . " {$day_schedule['start']}:00");
+                $day_end_time = strtotime(date('Y-m-d', $current_date) . " {$day_schedule['end']}:00");
+                
+                // Sessions can be booked up to 30 minutes before end time
+                $bookable_end_time = strtotime('-30 minutes', $day_end_time);
+                
+                // Start from day start time or current time if today, whichever is later
+                $start_time = ($current_date == strtotime($start_date)) ? max($day_start_time, $now) : $day_start_time;
                 
                 // Round up to next 30-minute slot
+                $start_hour = intval(date('H', $start_time));
+                $start_minute = intval(date('i', $start_time));
+                
                 if ($start_minute > 0 && $start_minute < 30) {
                     $start_minute = 30;
                 } elseif ($start_minute > 30) {
@@ -323,9 +380,11 @@ class DND_Speaking_REST_API {
                 }
                 
                 $current_time = strtotime(date('Y-m-d', $current_date) . " {$start_hour}:{$start_minute}:00");
-                $end_time = strtotime(date('Y-m-d', $current_date) . " 17:00:00");
                 
-                while ($current_time < $end_time) {
+                error_log("DEBUG: Day schedule: start=" . $day_schedule['start'] . ", end=" . $day_schedule['end']);
+                error_log("DEBUG: Processing slots from " . date('H:i', $current_time) . " to " . date('H:i', $bookable_end_time));
+                
+                while ($current_time <= $bookable_end_time) {
                     $slot_time = date('Y-m-d H:i:s', $current_time);
                     if (!in_array($slot_time, $booked_times)) {
                         $available_slots[] = [
