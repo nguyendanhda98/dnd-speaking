@@ -193,6 +193,9 @@ class DND_Speaking_REST_API {
         $teacher_id = intval($request->get_param('teacher_id'));
         $start_time = sanitize_text_field($request->get_param('start_time'));
 
+        // Set timezone to Vietnam
+        date_default_timezone_set('Asia/Ho_Chi_Minh');
+        
         // Validate start_time is in the future and within 1 week
         $start_timestamp = strtotime($start_time);
         $now = time();
@@ -239,8 +242,12 @@ class DND_Speaking_REST_API {
 
     public function get_teacher_availability($request) {
         $teacher_id = intval($request->get_param('teacher_id'));
-        $start_date = date('Y-m-d');
-        $end_date = date('Y-m-d', strtotime('+7 days'));
+        
+        // Set timezone to Vietnam
+        date_default_timezone_set('Asia/Ho_Chi_Minh');
+        $now = time();
+        $start_date = date('Y-m-d', $now);
+        $end_date = date('Y-m-d', strtotime('+7 days', $now));
 
         // Get booked sessions for this teacher in the next week
         global $wpdb;
@@ -258,7 +265,7 @@ class DND_Speaking_REST_API {
             $booked_times[] = date('Y-m-d H:i:s', strtotime($session->start_time));
         }
 
-        // Generate available slots: 9 AM to 5 PM, 1 hour slots
+        // Generate available slots: 9 AM to 5 PM, 30 minute slots, starting from current time
         $available_slots = [];
         $current_date = strtotime($start_date);
         $end_date_time = strtotime($end_date . ' 23:59:59');
@@ -266,15 +273,31 @@ class DND_Speaking_REST_API {
         while ($current_date <= $end_date_time) {
             $day_of_week = date('N', $current_date); // 1=Monday, 7=Sunday
             if ($day_of_week >= 1 && $day_of_week <= 5) { // Monday to Friday
-                for ($hour = 9; $hour < 17; $hour++) {
-                    $slot_time = date('Y-m-d H:i:s', strtotime(date('Y-m-d', $current_date) . " {$hour}:00:00"));
+                // Start from 9 AM or current time if today
+                $start_hour = ($current_date == strtotime($start_date)) ? max(9, intval(date('H', $now))) : 9;
+                $start_minute = ($current_date == strtotime($start_date) && $start_hour == intval(date('H', $now))) ? intval(date('i', $now)) : 0;
+                
+                // Round up to next 30-minute slot
+                if ($start_minute > 0 && $start_minute < 30) {
+                    $start_minute = 30;
+                } elseif ($start_minute > 30) {
+                    $start_minute = 0;
+                    $start_hour++;
+                }
+                
+                $current_time = strtotime(date('Y-m-d', $current_date) . " {$start_hour}:{$start_minute}:00");
+                $end_time = strtotime(date('Y-m-d', $current_date) . " 17:00:00");
+                
+                while ($current_time < $end_time) {
+                    $slot_time = date('Y-m-d H:i:s', $current_time);
                     if (!in_array($slot_time, $booked_times)) {
                         $available_slots[] = [
                             'date' => date('Y-m-d', $current_date),
-                            'time' => date('H:i', strtotime($slot_time)),
+                            'time' => date('H:i', $current_time),
                             'datetime' => $slot_time,
                         ];
                     }
+                    $current_time = strtotime('+30 minutes', $current_time);
                 }
             }
             $current_date = strtotime('+1 day', $current_date);
