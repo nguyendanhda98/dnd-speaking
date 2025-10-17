@@ -56,6 +56,7 @@ class DND_Speaking_Student_Session_History_Block {
             wp_localize_script('dnd-speaking-student-session-history', 'dnd_student_session_history_data', [
                 'user_id' => get_current_user_id(),
                 'ajax_url' => admin_url('admin-ajax.php'),
+                'rest_url' => rest_url(),
                 'nonce' => wp_create_nonce('student_session_history_nonce'),
             ]);
         }
@@ -169,71 +170,10 @@ class DND_Speaking_Student_Session_History_Block {
         $output .= '</form>';
         $output .= '</div>';
 
-        if (empty($sessions)) {
-            $output .= '<div class="dnd-no-history">No session history available</div>';
-        } else {
-            $output .= '<div class="dnd-history-list">';
-            foreach ($sessions as $session) {
-                $session_datetime = $session->session_date . ' ' . $session->session_time;
-                $formatted_date = date('M j, Y', strtotime($session->session_date));
-                $formatted_time = date('g:i A', strtotime($session->session_time));
-
-                $status_class = $session->status === 'completed' ? 'completed' : 'cancelled';
-                $status_text = $session->status === 'completed' ? 'Completed' : 'Cancelled';
-
-                $duration = isset($session->duration) ? $session->duration . ' min' : 'N/A';
-
-                $output .= '<div class="dnd-history-item ' . $status_class . '">';
-                $output .= '<div class="dnd-history-header">';
-                $output .= '<div class="dnd-teacher-name">' . esc_html($session->teacher_name) . '</div>';
-                $output .= '<div class="dnd-session-status ' . $status_class . '">' . $status_text . '</div>';
-                $output .= '</div>';
-
-                $output .= '<div class="dnd-history-details">';
-                $output .= '<div class="dnd-session-datetime">' . $formatted_date . ' at ' . $formatted_time . '</div>';
-                $output .= '<div class="dnd-session-duration">Duration: ' . $duration . '</div>';
-
-                if ($session->status === 'cancelled' && isset($cancelled_by_names[$session->id])) {
-                    $cancel_info = $cancelled_by_names[$session->id];
-                    $cancelled_at = !empty($cancel_info['at']) ? date('M j, Y g:i A', strtotime($cancel_info['at'])) : 'N/A';
-                    $output .= '<div class="dnd-session-cancellation">';
-                    $output .= '<strong>Cancelled by:</strong> ' . esc_html($cancel_info['name']) . '<br>';
-                    $output .= '<strong>Cancelled at:</strong> ' . $cancelled_at;
-                    $output .= '</div>';
-                }
-
-                $output .= '</div>';
-
-                if ($session->status === 'completed' && !empty($session->feedback)) {
-                    $output .= '<div class="dnd-session-feedback">';
-                    $output .= '<strong>Feedback:</strong> ' . esc_html($session->feedback);
-                    $output .= '</div>';
-                }
-
-                $output .= '</div>';
-            }
-            $output .= '</div>';
-
-            // Pagination
-            if ($total_pages > 1) {
-                $filter_param = $status_filter !== 'all' ? '&student_status_filter=' . $status_filter : '';
-                $per_page_param = '&student_per_page=' . $per_page;
-                $output .= '<div class="dnd-pagination">';
-                if ($page > 1) {
-                    $output .= '<a href="?student_history_page=' . ($page - 1) . $filter_param . $per_page_param . '" class="dnd-page-link">Previous</a>';
-                }
-
-                for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++) {
-                    $active_class = ($i === $page) ? ' active' : '';
-                    $output .= '<a href="?student_history_page=' . $i . $filter_param . $per_page_param . '" class="dnd-page-link' . $active_class . '">' . $i . '</a>';
-                }
-
-                if ($page < $total_pages) {
-                    $output .= '<a href="?student_history_page=' . ($page + 1) . $filter_param . $per_page_param . '" class="dnd-page-link">Next</a>';
-                }
-                $output .= '</div>';
-            }
-        }
+        // Content will be loaded via AJAX
+        $output .= '<div class="dnd-history-content">';
+        $output .= '<div class="dnd-loading" style="text-align: center; padding: 40px;">Loading session history...</div>';
+        $output .= '</div>';
 
         $output .= '</div>';
 
