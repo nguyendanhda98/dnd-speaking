@@ -315,9 +315,6 @@ class DND_Speaking_REST_API {
             }
         }
         
-        error_log("DEBUG: Weekly schedule for teacher $teacher_id: " . print_r($weekly_schedule, true));
-        error_log("DEBUG: Available days for teacher $teacher_id: " . print_r($available_days, true));
-        error_log("DEBUG: Day schedules for teacher $teacher_id: " . print_r($day_schedules, true));
         
         if (empty($available_days)) {
             // Default: all days Monday to Sunday if no schedule set
@@ -326,7 +323,6 @@ class DND_Speaking_REST_API {
             for ($i = 1; $i <= 7; $i++) {
                 $day_schedules[$i] = ['start' => '09:00', 'end' => '17:00'];
             }
-            error_log("DEBUG: Using default available days and schedules for teacher $teacher_id");
         }
 
         // Get booked sessions for this teacher in the next week
@@ -355,7 +351,6 @@ class DND_Speaking_REST_API {
             
             // Check if teacher is available on this day
             if (in_array($day_of_week, $available_days)) {
-                error_log("DEBUG: Processing available day $day_of_week for teacher $teacher_id on " . date('Y-m-d', $current_date));
                 
                 // Get schedule for this day
                 $day_schedule = isset($day_schedules[$day_of_week]) ? $day_schedules[$day_of_week] : ['start' => '09:00', 'end' => '17:00'];
@@ -380,9 +375,6 @@ class DND_Speaking_REST_API {
                 }
                 
                 $current_time = strtotime(date('Y-m-d', $current_date) . " {$start_hour}:{$start_minute}:00");
-                
-                error_log("DEBUG: Day schedule: start=" . $day_schedule['start'] . ", end=" . $day_schedule['end']);
-                error_log("DEBUG: Processing slots from " . date('H:i', $current_time) . " to " . date('H:i', $bookable_end_time));
                 
                 while ($current_time <= $bookable_end_time) {
                     $slot_time = date('Y-m-d H:i:s', $current_time);
