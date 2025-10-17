@@ -9,6 +9,18 @@ jQuery(document).ready(function($) {
         return;
     }
 
+    // Bind book now event handler immediately
+    $(document).on('click', '.dnd-btn-book', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        alert('Book now clicked! Teacher ID: ' + $(this).data('teacher-id'));
+        console.log('Book now clicked for teacher:', $(this).data('teacher-id'));
+        const teacherId = $(this).data('teacher-id');
+        const teacherName = $(this).closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
+        openBookingModal(teacherId, teacherName);
+        return false;
+    });
+
     // Fetch teachers
     $.ajax({
         url: dnd_speaking_data.rest_url + 'teachers',
@@ -213,13 +225,13 @@ jQuery(document).ready(function($) {
         }
     });
 
-    // Event delegation for book now button
-    $(document).off('click', '.dnd-btn-book').on('click', '.dnd-btn-book', function(e) {
-        e.preventDefault();
-        alert('Book now clicked!'); // Debug alert
-        console.log('Book now clicked for teacher:', $(this).data('teacher-id'));
-        const teacherId = $(this).data('teacher-id');
-        const teacherName = $(this).closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
-        openBookingModal(teacherId, teacherName);
-    });
+    // Event delegation for book now button - REMOVED, moved to top
+    // $(document).off('click', '.dnd-btn-book').on('click', '.dnd-btn-book', function(e) {
+    //     e.preventDefault();
+    //     alert('Book now clicked!'); // Debug alert
+    //     console.log('Book now clicked for teacher:', $(this).data('teacher-id'));
+    //     const teacherId = $(this).data('teacher-id');
+    //     const teacherName = $(this).closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
+    //     openBookingModal(teacherId, teacherName);
+    // });
 });
