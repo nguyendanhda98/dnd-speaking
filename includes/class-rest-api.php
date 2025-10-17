@@ -252,12 +252,33 @@ class DND_Speaking_REST_API {
         $start_date = date('Y-m-d', $now);
         $end_date = date('Y-m-d', strtotime('+7 days', $now));
 
-        // Get teacher's available days (1=Monday, 7=Sunday)
-        $available_days = get_user_meta($teacher_id, 'dnd_available_days', true);
+        // Get teacher's available days from weekly schedule (1=Monday, 7=Sunday)
+        $weekly_schedule = get_user_meta($teacher_id, 'dnd_weekly_schedule', true);
+        $available_days = [];
+        
+        if ($weekly_schedule && is_array($weekly_schedule)) {
+            $day_mapping = [
+                'monday' => 1,
+                'tuesday' => 2,
+                'wednesday' => 3,
+                'thursday' => 4,
+                'friday' => 5,
+                'saturday' => 6,
+                'sunday' => 7
+            ];
+            
+            foreach ($weekly_schedule as $day_key => $day_data) {
+                if (isset($day_data['enabled']) && $day_data['enabled'] && isset($day_mapping[$day_key])) {
+                    $available_days[] = $day_mapping[$day_key];
+                }
+            }
+        }
+        
+        error_log("DEBUG: Weekly schedule for teacher $teacher_id: " . print_r($weekly_schedule, true));
         error_log("DEBUG: Available days for teacher $teacher_id: " . print_r($available_days, true));
         
-        if (empty($available_days) || !is_array($available_days)) {
-            // Default: all days Monday to Sunday
+        if (empty($available_days)) {
+            // Default: all days Monday to Sunday if no schedule set
             $available_days = [1, 2, 3, 4, 5, 6, 7];
             error_log("DEBUG: Using default available days for teacher $teacher_id");
         }

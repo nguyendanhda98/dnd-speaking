@@ -8,12 +8,10 @@ class DND_Speaking_Admin {
     public function __construct() {
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
-        add_action('admin_post_update_teacher_availability', [$this, 'handle_update_teacher_availability']);
         add_action('wp_ajax_update_teacher_availability', [$this, 'update_teacher_availability']);
         add_action('wp_ajax_handle_teacher_request', [$this, 'handle_teacher_request']);
         add_action('wp_ajax_handle_upcoming_session', [$this, 'handle_upcoming_session']);
         add_action('wp_ajax_save_teacher_schedule', [$this, 'save_teacher_schedule']);
-        add_action('wp_ajax_get_teacher_availability_days', [$this, 'get_teacher_availability_days']);
     }
 
     public function add_admin_menu() {
@@ -164,11 +162,6 @@ class DND_Speaking_Admin {
             $session_count_map[$count['teacher_id']] = $count['sessions'];
         }
 
-        // Handle form submission
-        if (isset($_GET['updated']) && $_GET['updated'] === 'availability') {
-            echo '<div class="notice notice-success"><p>Teacher availability updated successfully.</p></div>';
-        }
-
         ?>
         <div class="wrap">
             <h1>Teachers (Role: <?php echo esc_html(wp_roles()->get_names()[$teacher_role] ?? $teacher_role); ?>)</h1>
@@ -179,105 +172,22 @@ class DND_Speaking_Admin {
                         <th>Name</th>
                         <th>Sessions Taught</th>
                         <th>Available</th>
-                        <th>Available Days</th>
-                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($users as $user): 
                         $sessions = $session_count_map[$user->ID] ?? 0;
                         $available = get_user_meta($user->ID, 'dnd_available', true) == '1';
-                        $available_days = get_user_meta($user->ID, 'dnd_available_days', true);
-                        if (empty($available_days) || !is_array($available_days)) {
-                            $available_days = [1, 2, 3, 4, 5, 6, 7]; // Default all days
-                        }
-                        $day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
                     ?>
                         <tr>
                             <td><?php echo $user->ID; ?></td>
                             <td><?php echo esc_html($user->display_name); ?></td>
                             <td><?php echo $sessions; ?></td>
                             <td><?php echo $available ? 'Yes' : 'No'; ?></td>
-                            <td>
-                                <?php 
-                                $selected_days = [];
-                                foreach ($available_days as $day) {
-                                    if (isset($day_names[$day - 1])) {
-                                        $selected_days[] = $day_names[$day - 1];
-                                    }
-                                }
-                                echo implode(', ', $selected_days);
-                                ?>
-                            </td>
-                            <td>
-                                <button class="button edit-availability" data-teacher-id="<?php echo $user->ID; ?>" data-teacher-name="<?php echo esc_attr($user->display_name); ?>">Edit Availability</button>
-                            </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
-
-            <!-- Modal for editing availability -->
-            <div id="availability-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-                <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%;">
-                    <h3>Edit Availability for <span id="modal-teacher-name"></span></h3>
-                    <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
-                        <input type="hidden" name="action" value="update_teacher_availability">
-                        <input type="hidden" name="teacher_id" id="modal-teacher-id">
-                        <input type="hidden" name="update_availability" value="1">
-                        <?php wp_nonce_field('update_availability_nonce'); ?>
-                        
-                        <p><strong>Select available days:</strong></p>
-                        <?php 
-                        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                        foreach ($days as $index => $day): 
-                            $day_num = $index + 1;
-                        ?>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="available_days[]" value="<?php echo $day_num; ?>" checked> <?php echo $day; ?>
-                            </label>
-                        <?php endforeach; ?>
-                        
-                        <p>
-                            <input type="submit" class="button button-primary" value="Update">
-                            <button type="button" class="button" onclick="jQuery('#availability-modal').hide()">Cancel</button>
-                        </p>
-                    </form>
-                </div>
-            </div>
-
-            <script>
-            jQuery(document).ready(function($) {
-                $('.edit-availability').on('click', function() {
-                    var teacherId = $(this).data('teacher-id');
-                    var teacherName = $(this).data('teacher-name');
-                    
-                    $('#modal-teacher-id').val(teacherId);
-                    $('#modal-teacher-name').text(teacherName);
-                    
-                    // Load current availability
-                    $.ajax({
-                        url: ajaxurl,
-                        method: 'POST',
-                        data: {
-                            action: 'get_teacher_availability_days',
-                            teacher_id: teacherId,
-                            nonce: '<?php echo wp_create_nonce("get_teacher_availability_days"); ?>'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                $('input[name="available_days[]"]').prop('checked', false);
-                                response.data.forEach(function(day) {
-                                    $('input[name="available_days[]"][value="' + day + '"]').prop('checked', true);
-                                });
-                            }
-                        }
-                    });
-                    
-                    $('#availability-modal').show();
-                });
-            });
-            </script>
         </div>
         <?php
     }
