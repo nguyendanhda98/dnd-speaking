@@ -31,14 +31,14 @@ jQuery(document).ready(function($) {
                     ${teacher.available ? 'Online' : 'Offline'}
                 </div>
                 <div class="dnd-teacher-buttons">
-                    <button class="dnd-btn dnd-btn-book" data-teacher-id="${teacher.id}">
+                    <button class="dnd-btn dnd-btn-book" type="button" data-teacher-id="${teacher.id}">
                         <svg class="dnd-btn-icon" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/>
                         </svg>
                         Book Now
                     </button>
                     ${teacher.available ? `
-                        <button class="dnd-btn dnd-btn-start" data-teacher-id="${teacher.id}">
+                        <button class="dnd-btn dnd-btn-start" type="button" data-teacher-id="${teacher.id}">
                             <svg class="dnd-btn-icon" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
                             </svg>
@@ -51,21 +51,33 @@ jQuery(document).ready(function($) {
 
         $teachersList.html(html);
 
-        // Handle button clicks
-        $('.dnd-btn-book').on('click', function() {
-            const teacherId = $(this).data('teacher-id');
-            // Handle book now - redirect to booking page or show modal
-            window.location.href = '/booking?teacher=' + teacherId;
-        });
+        // Add booking modal
+        if (!$('#dnd-booking-modal').length) {
+            $('body').append(`
+                <div id="dnd-booking-modal" class="dnd-booking-modal">
+                    <div class="dnd-modal-content">
+                        <div class="dnd-modal-header">
+                            <h2 class="dnd-modal-title">Book Session</h2>
+                            <button class="dnd-modal-close">&times;</button>
+                        </div>
+                        <div id="dnd-availability-slots"></div>
+                        <button id="dnd-confirm-booking" class="dnd-book-btn" style="display:none;">Book Selected Slot</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        // Handle button clicks - moved outside renderTeachers for better event delegation
+        // $('.dnd-btn-book').on('click', function(e) {
+        //     e.preventDefault();
+        //     console.log('Book now clicked for teacher:', $(this).data('teacher-id'));
+        //     const teacherId = $(this).data('teacher-id');
+        //     const teacherName = $(this).closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
+        //     openBookingModal(teacherId, teacherName);
+        // });
 
         $('.dnd-btn-start').on('click', function() {
             const teacherId = $(this).data('teacher-id');
-            startSession(teacherId);
-        });
-
-        $('.dnd-btn-start').on('click', function() {
-            const teacherId = $(this).data('teacher-id');
-            // Handle start now - start session
             startSession(teacherId);
         });
     }
@@ -93,4 +105,121 @@ jQuery(document).ready(function($) {
             }
         });
     }
+
+    function openBookingModal(teacherId, teacherName) {
+        $('#dnd-booking-modal .dnd-modal-title').text('Book Session with ' + teacherName);
+        $('#dnd-availability-slots').html('<p>Loading availability...</p>');
+        $('#dnd-confirm-booking').hide();
+
+        // Fetch availability
+        $.ajax({
+            url: dnd_speaking_data.rest_url + 'teacher-availability/' + teacherId,
+            method: 'GET',
+            success: function(slots) {
+                renderAvailabilitySlots(slots, teacherId);
+            },
+            error: function(xhr) {
+                $('#dnd-availability-slots').html('<p>Error loading availability.</p>');
+            }
+        });
+
+        $('#dnd-booking-modal').addClass('show');
+    }
+
+    function renderAvailabilitySlots(slots, teacherId) {
+        if (slots.length === 0) {
+            $('#dnd-availability-slots').html('<p>No available slots in the next week.</p>');
+            return;
+        }
+
+        const groupedSlots = {};
+        slots.forEach(slot => {
+            const date = slot.date;
+            if (!groupedSlots[date]) {
+                groupedSlots[date] = [];
+            }
+            groupedSlots[date].push(slot);
+        });
+
+        let html = '';
+        Object.keys(groupedSlots).sort().forEach(date => {
+            const dateObj = new Date(date);
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+            const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            html += `<h3>${dayName}, ${formattedDate}</h3>`;
+            html += '<div class="dnd-availability-grid">';
+            groupedSlots[date].forEach(slot => {
+                html += `
+                    <div class="dnd-time-slot available" data-datetime="${slot.datetime}">
+                        ${slot.time}
+                    </div>
+                `;
+            });
+            html += '</div>';
+        });
+
+        $('#dnd-availability-slots').html(html);
+
+        // Handle slot selection
+        let selectedSlot = null;
+        $('.dnd-time-slot.available').on('click', function() {
+            $('.dnd-time-slot').removeClass('selected');
+            $(this).addClass('selected');
+            selectedSlot = $(this).data('datetime');
+            $('#dnd-confirm-booking').show();
+        });
+
+        // Handle booking confirmation
+        $('#dnd-confirm-booking').off('click').on('click', function() {
+            if (selectedSlot) {
+                bookSession(teacherId, selectedSlot);
+            }
+        });
+    }
+
+    function bookSession(teacherId, datetime) {
+        const studentId = dnd_speaking_data.user_id;
+        $.ajax({
+            url: dnd_speaking_data.rest_url + 'book-session',
+            method: 'POST',
+            data: {
+                student_id: studentId,
+                teacher_id: teacherId,
+                start_time: datetime
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert('Session booked successfully!');
+                    $('#dnd-booking-modal').removeClass('show');
+                    // Refresh upcoming sessions if needed
+                } else {
+                    alert('Failed to book session: ' + (response.message || 'Unknown error'));
+                }
+            },
+            error: function(xhr) {
+                alert('Error booking session: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error'));
+            }
+        });
+    }
+
+    // Close modal
+    $(document).on('click', '.dnd-modal-close', function() {
+        $('#dnd-booking-modal').removeClass('show');
+    });
+
+    $(document).on('click', '#dnd-booking-modal', function(e) {
+        if (e.target === this) {
+            $(this).removeClass('show');
+        }
+    });
+
+    // Event delegation for book now button
+    $(document).off('click', '.dnd-btn-book').on('click', '.dnd-btn-book', function(e) {
+        e.preventDefault();
+        alert('Book now clicked!'); // Debug alert
+        console.log('Book now clicked for teacher:', $(this).data('teacher-id'));
+        const teacherId = $(this).data('teacher-id');
+        const teacherName = $(this).closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
+        openBookingModal(teacherId, teacherName);
+    });
 });

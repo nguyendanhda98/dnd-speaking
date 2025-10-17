@@ -23,6 +23,9 @@ require_once plugin_dir_path(__FILE__) . 'blocks/schedule-settings-block.php';
 require_once plugin_dir_path(__FILE__) . 'blocks/session-history-block.php';
 require_once plugin_dir_path(__FILE__) . 'blocks/feedback-block.php';
 
+// Autoload blocks
+require_once plugin_dir_path(__FILE__) . 'blocks/student-sessions-block.php';
+
 // Activation / deactivation hooks
 register_activation_hook(__FILE__, ['DND_Speaking_Activator', 'activate']);
 register_deactivation_hook(__FILE__, ['DND_Speaking_Deactivator', 'deactivate']);

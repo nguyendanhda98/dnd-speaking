@@ -1,0 +1,85 @@
+.dnd-student-sessions-block {
+    font-family: Arial, sans-serif;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.dnd-student-sessions-block h3 {
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.dnd-student-sessions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.dnd-session-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dnd-session-teacher {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.dnd-session-status {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.dnd-session-status.pending {
+    color: #ffc107;
+}
+
+.dnd-session-status.confirmed {
+    color: #28a745;
+}
+
+.dnd-session-time {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.dnd-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.dnd-btn-cancel {
+    background: #dc3545;
+    color: white;
+}
+
+.dnd-btn-cancel:hover {
+    background: #c82333;
+}
+
+.dnd-student-sessions-preview {
+    border: 1px dashed #ccc;
+    padding: 15px;
+    background: #f9f9f9;
+}
+
+.dnd-session-sample {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    background: #fff;
+    margin-top: 10px;
+}
