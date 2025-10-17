@@ -252,6 +252,13 @@ class DND_Speaking_REST_API {
         $start_date = date('Y-m-d', $now);
         $end_date = date('Y-m-d', strtotime('+7 days', $now));
 
+        // Get teacher's available days (1=Monday, 7=Sunday)
+        $available_days = get_user_meta($teacher_id, 'dnd_available_days', true);
+        if (empty($available_days) || !is_array($available_days)) {
+            // Default: all days Monday to Sunday
+            $available_days = [1, 2, 3, 4, 5, 6, 7];
+        }
+
         // Get booked sessions for this teacher in the next week
         global $wpdb;
         $table = $wpdb->prefix . 'dnd_speaking_sessions';
@@ -275,7 +282,9 @@ class DND_Speaking_REST_API {
 
         while ($current_date <= $end_date_time) {
             $day_of_week = date('N', $current_date); // 1=Monday, 7=Sunday
-            if ($day_of_week >= 1 && $day_of_week <= 5) { // Monday to Friday
+            
+            // Check if teacher is available on this day
+            if (in_array($day_of_week, $available_days)) {
                 // Start from 9 AM or current time if today
                 $start_hour = ($current_date == strtotime($start_date)) ? max(9, intval(date('H', $now))) : 9;
                 $start_minute = ($current_date == strtotime($start_date) && $start_hour == intval(date('H', $now))) ? intval(date('i', $now)) : 0;
