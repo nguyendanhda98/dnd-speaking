@@ -167,9 +167,16 @@ jQuery(document).ready(function($) {
             html += `<h3>${dayName}, ${formattedDate}</h3>`;
             html += '<div class="dnd-availability-grid">';
             groupedSlots[date].forEach(slot => {
+                // Convert 24-hour time to 12-hour format with AM/PM
+                const time24 = slot.time;
+                const [hours, minutes] = time24.split(':');
+                const hour12 = hours % 12 || 12;
+                const ampm = hours < 12 ? 'AM' : 'PM';
+                const time12 = `${hour12}:${minutes} ${ampm}`;
+                
                 html += `
                     <div class="dnd-time-slot available" data-datetime="${slot.datetime}">
-                        ${slot.time}
+                        ${time12}
                     </div>
                 `;
             });
