@@ -365,7 +365,7 @@ class DND_Speaking_REST_API {
                     'total_sessions' => $total_sessions
                 ]
             ]);
-            error_log('AJAX Student Session History - Response sent successfully');
+        error_log('AJAX Student Session History - Response sent successfully for user ' . get_current_user_id());
         } catch (Exception $e) {
             wp_send_json_error('An error occurred: ' . $e->getMessage());
         }

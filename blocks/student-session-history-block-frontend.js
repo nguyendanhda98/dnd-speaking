@@ -46,7 +46,7 @@ jQuery(document).ready(function($) {
 
     function loadSessionHistory() {
         // Show loading state
-        var $contentArea = $historyContainer.find('.dnd-history-list, .dnd-pagination, .dnd-no-history');
+        var $contentArea = $historyContainer.find('.dnd-history-content');
         $contentArea.html('<div class="dnd-loading" style="text-align: center; padding: 40px;">Loading...</div>');
 
         $.ajax({
