@@ -254,9 +254,12 @@ class DND_Speaking_REST_API {
 
         // Get teacher's available days (1=Monday, 7=Sunday)
         $available_days = get_user_meta($teacher_id, 'dnd_available_days', true);
+        error_log("DEBUG: Available days for teacher $teacher_id: " . print_r($available_days, true));
+        
         if (empty($available_days) || !is_array($available_days)) {
             // Default: all days Monday to Sunday
             $available_days = [1, 2, 3, 4, 5, 6, 7];
+            error_log("DEBUG: Using default available days for teacher $teacher_id");
         }
 
         // Get booked sessions for this teacher in the next week
@@ -285,6 +288,7 @@ class DND_Speaking_REST_API {
             
             // Check if teacher is available on this day
             if (in_array($day_of_week, $available_days)) {
+                error_log("DEBUG: Processing available day $day_of_week for teacher $teacher_id on " . date('Y-m-d', $current_date));
                 // Start from 9 AM or current time if today
                 $start_hour = ($current_date == strtotime($start_date)) ? max(9, intval(date('H', $now))) : 9;
                 $start_minute = ($current_date == strtotime($start_date) && $start_hour == intval(date('H', $now))) ? intval(date('i', $now)) : 0;

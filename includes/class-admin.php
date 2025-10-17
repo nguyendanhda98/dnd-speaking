@@ -8,7 +8,7 @@ class DND_Speaking_Admin {
     public function __construct() {
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
-        add_action('admin_post_add_credits', [$this, 'handle_add_credits']);
+        add_action('admin_post_update_teacher_availability', [$this, 'handle_update_teacher_availability']);
         add_action('wp_ajax_update_teacher_availability', [$this, 'update_teacher_availability']);
         add_action('wp_ajax_handle_teacher_request', [$this, 'handle_teacher_request']);
         add_action('wp_ajax_handle_upcoming_session', [$this, 'handle_upcoming_session']);
@@ -165,17 +165,8 @@ class DND_Speaking_Admin {
         }
 
         // Handle form submission
-        if (isset($_POST['update_availability']) && isset($_POST['teacher_id'])) {
-            if (!wp_verify_nonce($_POST['_wpnonce'], 'update_availability_nonce')) {
-                echo '<div class="notice notice-error"><p>Security check failed.</p></div>';
-            } elseif (!current_user_can('manage_options')) {
-                echo '<div class="notice notice-error"><p>Insufficient permissions.</p></div>';
-            } else {
-                $teacher_id = intval($_POST['teacher_id']);
-                $available_days = isset($_POST['available_days']) ? array_map('intval', $_POST['available_days']) : [];
-                update_user_meta($teacher_id, 'dnd_available_days', $available_days);
-                echo '<div class="notice notice-success"><p>Availability updated successfully.</p></div>';
-            }
+        if (isset($_GET['updated']) && $_GET['updated'] === 'availability') {
+            echo '<div class="notice notice-success"><p>Teacher availability updated successfully.</p></div>';
         }
 
         ?>
@@ -230,7 +221,8 @@ class DND_Speaking_Admin {
             <div id="availability-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
                 <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%;">
                     <h3>Edit Availability for <span id="modal-teacher-name"></span></h3>
-                    <form method="post">
+                    <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
+                        <input type="hidden" name="action" value="update_teacher_availability">
                         <input type="hidden" name="teacher_id" id="modal-teacher-id">
                         <input type="hidden" name="update_availability" value="1">
                         <?php wp_nonce_field('update_availability_nonce'); ?>
@@ -679,5 +671,27 @@ class DND_Speaking_Admin {
         }
 
         wp_send_json_success($available_days);
+    }
+
+    public function handle_update_teacher_availability() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['_wpnonce'], 'update_availability_nonce')) {
+            wp_die('Security check failed');
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_die('Insufficient permissions');
+        }
+
+        $teacher_id = intval($_POST['teacher_id']);
+        $available_days = isset($_POST['available_days']) ? array_map('intval', $_POST['available_days']) : [];
+
+        // Update user meta
+        update_user_meta($teacher_id, 'dnd_available_days', $available_days);
+
+        // Redirect back to teachers page with success message
+        wp_redirect(add_query_arg('updated', 'availability', admin_url('admin.php?page=dnd-speaking-teachers')));
+        exit;
     }
 }
