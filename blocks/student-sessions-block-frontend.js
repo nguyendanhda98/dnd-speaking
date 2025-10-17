@@ -13,6 +13,9 @@ jQuery(document).ready(function($) {
     $.ajax({
         url: dnd_speaking_data.rest_url + 'student-sessions',
         method: 'GET',
+        headers: {
+            'X-WP-Nonce': dnd_speaking_data.nonce
+        },
         success: function(sessions) {
             console.log('Student sessions loaded:', sessions); // Debug log
             renderSessions(sessions);
