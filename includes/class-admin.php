@@ -99,12 +99,27 @@ class DND_Speaking_Admin {
                 <?php wp_nonce_field('add_credits_nonce'); ?>
                 <table class="form-table">
                     <tr>
-                        <th><label for="user_id">User ID</label></th>
-                        <td><input type="number" name="user_id" id="user_id" required></td>
+                        <th><label for="user_id">Select Student</label></th>
+                        <td>
+                            <select name="user_id" id="user_id" required>
+                                <option value="">Choose a student...</option>
+                                <?php
+                                // Get all users except administrators
+                                $users = get_users([
+                                    'role__not_in' => ['administrator'],
+                                    'orderby' => 'display_name',
+                                    'order' => 'ASC'
+                                ]);
+                                foreach ($users as $user) {
+                                    echo '<option value="' . esc_attr($user->ID) . '">' . esc_html($user->display_name) . ' (' . esc_html($user->user_login) . ')</option>';
+                                }
+                                ?>
+                            </select>
+                        </td>
                     </tr>
                     <tr>
                         <th><label for="credits">Credits to Add</label></th>
-                        <td><input type="number" name="credits" id="credits" required></td>
+                        <td><input type="number" name="credits" id="credits" required min="1"></td>
                     </tr>
                 </table>
                 <?php submit_button('Add Credits'); ?>
@@ -323,6 +338,36 @@ class DND_Speaking_Admin {
         }
         echo '</select>';
         echo '<p class="description">Select which WordPress role should be considered as teachers.</p>';
+    }
+
+    public function handle_add_credits() {
+        // Check nonce for security
+        if (!wp_verify_nonce($_POST['_wpnonce'], 'add_credits_nonce')) {
+            wp_die('Security check failed');
+        }
+
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        $user_id = intval($_POST['user_id']);
+        $credits = intval($_POST['credits']);
+
+        // Validate input
+        if ($user_id <= 0 || $credits <= 0) {
+            wp_die('Invalid input');
+        }
+
+        // Add credits using helper function
+        DND_Speaking_Helpers::add_user_credits($user_id, $credits);
+
+        // Log the action
+        DND_Speaking_Helpers::log_action(get_current_user_id(), 'add_credits', "Added $credits credits to user $user_id");
+
+        // Redirect back with success message
+        wp_redirect(admin_url('admin.php?page=dnd-speaking-students&added=1'));
+        exit;
     }
 
     public function update_teacher_availability() {
