@@ -106,6 +106,9 @@ class DND_Speaking_REST_API {
         $teacher_id = intval($request->get_param('teacher_id'));
         $discord_channel = sanitize_text_field($request->get_param('discord_channel'));
 
+        // Set timezone to Vietnam
+        date_default_timezone_set('Asia/Ho_Chi_Minh');
+
         // Check credits
         if (!DND_Speaking_Helpers::deduct_user_credits($student_id)) {
             return new WP_Error('insufficient_credits', 'Not enough credits', ['status' => 400]);
