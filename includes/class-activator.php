@@ -9,6 +9,7 @@ class DND_Speaking_Activator {
 
     public static function activate() {
         self::create_database_tables();
+        self::update_database_tables();
         flush_rewrite_rules();
     }
 
@@ -37,6 +38,8 @@ class DND_Speaking_Activator {
             start_time datetime DEFAULT CURRENT_TIMESTAMP,
             end_time datetime DEFAULT NULL,
             duration int(11) DEFAULT 0,
+            cancelled_by bigint(20) DEFAULT NULL,
+            cancelled_at datetime DEFAULT NULL,
             PRIMARY KEY (id)
         ) $charset_collate;";
 
@@ -55,5 +58,34 @@ class DND_Speaking_Activator {
         dbDelta($sql_credits);
         dbDelta($sql_sessions);
         dbDelta($sql_logs);
+    }
+
+    public static function update_database_tables() {
+        global $wpdb;
+        $table_sessions = $wpdb->prefix . 'dnd_speaking_sessions';
+
+        // Check if table exists
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_sessions'") != $table_sessions) {
+            return; // Table doesn't exist yet
+        }
+
+        // Check if columns exist and add if not
+        $columns = $wpdb->get_col("DESCRIBE $table_sessions");
+
+        if (!in_array('session_date', $columns)) {
+            $wpdb->query("ALTER TABLE $table_sessions ADD COLUMN session_date date DEFAULT NULL");
+        }
+
+        if (!in_array('session_time', $columns)) {
+            $wpdb->query("ALTER TABLE $table_sessions ADD COLUMN session_time time DEFAULT NULL");
+        }
+
+        if (!in_array('cancelled_by', $columns)) {
+            $wpdb->query("ALTER TABLE $table_sessions ADD COLUMN cancelled_by bigint(20) DEFAULT NULL");
+        }
+
+        if (!in_array('cancelled_at', $columns)) {
+            $wpdb->query("ALTER TABLE $table_sessions ADD COLUMN cancelled_at datetime DEFAULT NULL");
+        }
     }
 }

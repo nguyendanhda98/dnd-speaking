@@ -1,9 +1,9 @@
 <?php
 /**
- * Gutenberg block for session history
+ * Gutenberg block for student session history
  */
 
-class DND_Speaking_Session_History_Block {
+class DND_Speaking_Student_Session_History_Block {
 
     public function __construct() {
         add_action('init', [$this, 'register_block']);
@@ -13,22 +13,22 @@ class DND_Speaking_Session_History_Block {
     }
 
     public function register_block() {
-        register_block_type('dnd-speaking/session-history', [
+        register_block_type('dnd-speaking/student-session-history', [
             'render_callback' => [$this, 'render_block'],
         ]);
     }
 
     public function enqueue_editor_assets() {
         wp_enqueue_script(
-            'dnd-speaking-session-history-editor',
-            plugin_dir_url(__FILE__) . 'session-history-block.js',
+            'dnd-speaking-student-session-history-editor',
+            plugin_dir_url(__FILE__) . 'student-session-history-block.js',
             ['wp-blocks', 'wp-element'],
             '1.0.0'
         );
 
         wp_enqueue_style(
-            'dnd-speaking-session-history-editor-style',
-            plugin_dir_url(__FILE__) . 'session-history-block.css',
+            'dnd-speaking-student-session-history-editor-style',
+            plugin_dir_url(__FILE__) . 'student-session-history-block.css',
             [],
             '1.0.0'
         );
@@ -36,60 +36,56 @@ class DND_Speaking_Session_History_Block {
 
     public function enqueue_frontend_assets() {
         wp_enqueue_style(
-            'dnd-speaking-session-history-style',
-            plugin_dir_url(__FILE__) . 'session-history-block.css',
+            'dnd-speaking-student-session-history-style',
+            plugin_dir_url(__FILE__) . 'student-session-history-block.css',
             [],
             '1.0.0'
         );
     }
 
     public function enqueue_frontend_scripts() {
-        if (has_block('dnd-speaking/session-history')) {
+        if (has_block('dnd-speaking/student-session-history')) {
             wp_enqueue_script(
-                'dnd-speaking-session-history',
-                plugin_dir_url(__FILE__) . 'session-history-block-frontend.js',
+                'dnd-speaking-student-session-history',
+                plugin_dir_url(__FILE__) . 'student-session-history-block-frontend.js',
                 ['jquery'],
                 '1.0.0',
                 true
             );
 
-            wp_localize_script('dnd-speaking-session-history', 'dnd_session_history_data', [
+            wp_localize_script('dnd-speaking-student-session-history', 'dnd_student_session_history_data', [
                 'user_id' => get_current_user_id(),
                 'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('session_history_nonce'),
+                'nonce' => wp_create_nonce('student_session_history_nonce'),
             ]);
         }
     }
 
     public function render_block($attributes) {
         if (!is_user_logged_in()) {
-            return '<div class="dnd-session-history"><p>Vui lòng đăng nhập để xem session history.</p></div>';
+            return '<div class="dnd-student-session-history"><p>Vui lòng đăng nhập để xem lịch sử buổi học.</p></div>';
         }
 
         $user_id = get_current_user_id();
-        $page = isset($_GET['history_page']) ? intval($_GET['history_page']) : 1;
-        $per_page = isset($_GET['per_page']) ? intval($_GET['per_page']) : 10;
+        $page = isset($_GET['student_history_page']) ? intval($_GET['student_history_page']) : 1;
+        $per_page = isset($_GET['student_per_page']) ? intval($_GET['student_per_page']) : 10;
         $allowed_per_page = [1, 3, 5, 10];
         if (!in_array($per_page, $allowed_per_page)) {
             $per_page = 10;
         }
         $offset = ($page - 1) * $per_page;
-        
+
         // Get filter
-        $status_filter = isset($_GET['status_filter']) ? sanitize_text_field($_GET['status_filter']) : 'all';
+        $status_filter = isset($_GET['student_status_filter']) ? sanitize_text_field($_GET['student_status_filter']) : 'all';
         $allowed_filters = ['all', 'completed', 'cancelled'];
         if (!in_array($status_filter, $allowed_filters)) {
             $status_filter = 'all';
         }
 
-        // Get completed sessions
-        global $wpdb;
-        $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
-
         // Build WHERE clause based on filter
-        $where_clause = "s.teacher_id = %d";
+        $where_clause = "s.student_id = %d";
         $query_params = [$user_id];
-        
+
         if ($status_filter !== 'all') {
             $where_clause .= " AND s.status = %s";
             $query_params[] = $status_filter;
@@ -97,23 +93,34 @@ class DND_Speaking_Session_History_Block {
             $where_clause .= " AND s.status IN ('completed', 'cancelled')";
         }
 
-        $completed_sessions = $wpdb->get_results($wpdb->prepare(
-            "SELECT s.*, u.display_name as student_name
+        global $wpdb;
+        $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
+
+        $sessions = $wpdb->get_results($wpdb->prepare(
+            "SELECT s.*, t.display_name as teacher_name
              FROM $sessions_table s
-             LEFT JOIN {$wpdb->users} u ON s.student_id = u.ID
+             LEFT JOIN {$wpdb->users} t ON s.teacher_id = t.ID
              WHERE $where_clause
              ORDER BY s.session_date DESC, s.session_time DESC
              LIMIT %d OFFSET %d",
             array_merge($query_params, [$per_page, $offset])
         ));
 
+        // Get total count for pagination
+        $total_sessions = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $sessions_table s WHERE $where_clause",
+            $query_params
+        ));
+
+        $total_pages = ceil($total_sessions / $per_page);
+
         // Get cancelled_by names if column exists and needed
         $cancelled_by_names = [];
         $columns = $wpdb->get_col("DESCRIBE $sessions_table");
         if (in_array('cancelled_by', $columns) && ($status_filter === 'all' || $status_filter === 'cancelled')) {
-            $cancel_where = "s.teacher_id = %d AND s.status = 'cancelled'";
+            $cancel_where = "s.student_id = %d AND s.status = 'cancelled'";
             $cancel_params = [$user_id];
-            
+
             $cancelled_sessions = $wpdb->get_results($wpdb->prepare(
                 "SELECT s.id, cu.display_name as cancelled_by_name, s.cancelled_at
                  FROM $sessions_table s
@@ -131,32 +138,24 @@ class DND_Speaking_Session_History_Block {
             }
         }
 
-        // Get total count for pagination
-        $total_sessions = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM $sessions_table s WHERE $where_clause",
-            $query_params
-        ));
+        $output = '<div class="dnd-student-session-history">';
+        $output .= '<h3>My Session History</h3>';
 
-        $total_pages = ceil($total_sessions / $per_page);
-
-        $output = '<div class="dnd-session-history">';
-        $output .= '<h3>Session History</h3>';
-        
         // Add filter form
         $output .= '<div class="dnd-history-filters">';
-        $output .= '<form method="GET" class="dnd-filter-form" id="dnd-history-filter-form">';
+        $output .= '<form method="GET" class="dnd-filter-form" id="dnd-student-history-filter-form">';
         $output .= '<div class="dnd-filter-row">';
         $output .= '<div class="dnd-filter-group">';
-        $output .= '<label for="status_filter">Filter by status:</label>';
-        $output .= '<select name="status_filter" id="status_filter">';
+        $output .= '<label for="student_status_filter">Filter by status:</label>';
+        $output .= '<select name="student_status_filter" id="student_status_filter">';
         $output .= '<option value="all"' . ($status_filter === 'all' ? ' selected' : '') . '>All Sessions</option>';
         $output .= '<option value="completed"' . ($status_filter === 'completed' ? ' selected' : '') . '>Completed</option>';
         $output .= '<option value="cancelled"' . ($status_filter === 'cancelled' ? ' selected' : '') . '>Cancelled</option>';
         $output .= '</select>';
         $output .= '</div>';
         $output .= '<div class="dnd-filter-group">';
-        $output .= '<label for="per_page">Items per page:</label>';
-        $output .= '<select name="per_page" id="per_page">';
+        $output .= '<label for="student_per_page">Items per page:</label>';
+        $output .= '<select name="student_per_page" id="student_per_page">';
         foreach ($allowed_per_page as $option) {
             $selected = ($per_page == $option) ? ' selected' : '';
             $output .= '<option value="' . $option . '"' . $selected . '>' . $option . '</option>';
@@ -170,11 +169,11 @@ class DND_Speaking_Session_History_Block {
         $output .= '</form>';
         $output .= '</div>';
 
-        if (empty($completed_sessions)) {
+        if (empty($sessions)) {
             $output .= '<div class="dnd-no-history">No session history available</div>';
         } else {
             $output .= '<div class="dnd-history-list">';
-            foreach ($completed_sessions as $session) {
+            foreach ($sessions as $session) {
                 $session_datetime = $session->session_date . ' ' . $session->session_time;
                 $formatted_date = date('M j, Y', strtotime($session->session_date));
                 $formatted_time = date('g:i A', strtotime($session->session_time));
@@ -186,7 +185,7 @@ class DND_Speaking_Session_History_Block {
 
                 $output .= '<div class="dnd-history-item ' . $status_class . '">';
                 $output .= '<div class="dnd-history-header">';
-                $output .= '<div class="dnd-student-name">' . esc_html($session->student_name) . '</div>';
+                $output .= '<div class="dnd-teacher-name">' . esc_html($session->teacher_name) . '</div>';
                 $output .= '<div class="dnd-session-status ' . $status_class . '">' . $status_text . '</div>';
                 $output .= '</div>';
 
@@ -217,20 +216,20 @@ class DND_Speaking_Session_History_Block {
 
             // Pagination
             if ($total_pages > 1) {
-                $filter_param = $status_filter !== 'all' ? '&status_filter=' . $status_filter : '';
-                $per_page_param = '&per_page=' . $per_page;
+                $filter_param = $status_filter !== 'all' ? '&student_status_filter=' . $status_filter : '';
+                $per_page_param = '&student_per_page=' . $per_page;
                 $output .= '<div class="dnd-pagination">';
                 if ($page > 1) {
-                    $output .= '<a href="?history_page=' . ($page - 1) . $filter_param . $per_page_param . '" class="dnd-page-link">Previous</a>';
+                    $output .= '<a href="?student_history_page=' . ($page - 1) . $filter_param . $per_page_param . '" class="dnd-page-link">Previous</a>';
                 }
 
                 for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++) {
                     $active_class = ($i === $page) ? ' active' : '';
-                    $output .= '<a href="?history_page=' . $i . $filter_param . $per_page_param . '" class="dnd-page-link' . $active_class . '">' . $i . '</a>';
+                    $output .= '<a href="?student_history_page=' . $i . $filter_param . $per_page_param . '" class="dnd-page-link' . $active_class . '">' . $i . '</a>';
                 }
 
                 if ($page < $total_pages) {
-                    $output .= '<a href="?history_page=' . ($page + 1) . $filter_param . $per_page_param . '" class="dnd-page-link">Next</a>';
+                    $output .= '<a href="?student_history_page=' . ($page + 1) . $filter_param . $per_page_param . '" class="dnd-page-link">Next</a>';
                 }
                 $output .= '</div>';
             }
@@ -243,4 +242,4 @@ class DND_Speaking_Session_History_Block {
 }
 
 // Initialize the block
-new DND_Speaking_Session_History_Block();
+new DND_Speaking_Student_Session_History_Block();

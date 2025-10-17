@@ -25,6 +25,7 @@ require_once plugin_dir_path(__FILE__) . 'blocks/feedback-block.php';
 
 // Autoload blocks
 require_once plugin_dir_path(__FILE__) . 'blocks/student-sessions-block.php';
+require_once plugin_dir_path(__FILE__) . 'blocks/student-session-history-block.php';
 
 // Activation / deactivation hooks
 register_activation_hook(__FILE__, ['DND_Speaking_Activator', 'activate']);
@@ -32,9 +33,13 @@ register_deactivation_hook(__FILE__, ['DND_Speaking_Deactivator', 'deactivate'])
 
 // Initialize main plugin
 add_action('plugins_loaded', function() {
+    // Update database if needed
+    if (class_exists('DND_Speaking_Activator')) {
+        DND_Speaking_Activator::update_database_tables();
+    }
+    
     new DND_Speaking_REST_API();
     new DND_Speaking_Admin();
-    new DND_Speaking_REST_API();
 });
 
 // Enqueue blocks script

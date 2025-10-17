@@ -184,9 +184,16 @@ class DND_Speaking_REST_API {
         }
 
         // Update status to cancelled
-        $wpdb->update($table, [
-            'status' => 'cancelled'
-        ], ['id' => $session_id]);
+        $update_data = ['status' => 'cancelled'];
+        
+        // Check if cancelled_by column exists
+        $columns = $wpdb->get_col("DESCRIBE $table");
+        if (in_array('cancelled_by', $columns)) {
+            $update_data['cancelled_by'] = $user_id;
+            $update_data['cancelled_at'] = current_time('mysql');
+        }
+        
+        $wpdb->update($table, $update_data, ['id' => $session_id]);
 
         return ['success' => true];
     }
@@ -290,12 +297,21 @@ class DND_Speaking_REST_API {
         }
 
         // Book the session
-        $wpdb->insert($table, [
+        $insert_data = [
             'student_id' => $student_id,
             'teacher_id' => $teacher_id,
             'start_time' => $start_time,
             'status' => 'pending'
-        ]);
+        ];
+        
+        // Check if session_date/session_time columns exist
+        $columns = $wpdb->get_col("DESCRIBE $table");
+        if (in_array('session_date', $columns) && in_array('session_time', $columns)) {
+            $insert_data['session_date'] = date('Y-m-d', $start_timestamp);
+            $insert_data['session_time'] = date('H:i:s', $start_timestamp);
+        }
+        
+        $wpdb->insert($table, $insert_data);
 
         return ['success' => true, 'session_id' => $wpdb->insert_id];
     }

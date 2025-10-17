@@ -1,0 +1,234 @@
+/* Student Session History Block Styles */
+
+.dnd-student-session-history {
+    background: #fff;
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.dnd-student-session-history h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.dnd-no-history {
+    text-align: center;
+    color: #666;
+    padding: 40px 20px;
+    font-style: italic;
+}
+
+.dnd-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.dnd-history-item {
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 15px;
+    transition: all 0.2s ease;
+}
+
+.dnd-history-item:hover {
+    border-color: #dadce0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dnd-history-item.completed {
+    border-left: 4px solid #28a745;
+}
+
+.dnd-history-item.cancelled {
+    border-left: 4px solid #dc3545;
+}
+
+.dnd-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.dnd-teacher-name {
+    font-weight: 600;
+    color: #495057;
+    font-size: 16px;
+}
+
+.dnd-session-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.dnd-session-status.completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.dnd-session-status.cancelled {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.dnd-history-details {
+    margin-bottom: 10px;
+}
+
+.dnd-session-datetime {
+    color: #6c757d;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.dnd-session-duration {
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.dnd-session-cancellation {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 8px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: #856404;
+}
+
+.dnd-session-feedback {
+    background: #f8f9fa;
+    border-left: 3px solid #007cba;
+    padding: 10px;
+    margin-top: 10px;
+    font-size: 14px;
+    color: #495057;
+}
+
+.dnd-history-filters {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.dnd-filter-form {
+    margin: 0;
+}
+
+.dnd-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.dnd-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.dnd-filter-group label {
+    font-weight: 500;
+    color: #495057;
+    margin: 0;
+    font-size: 14px;
+}
+
+.dnd-filter-group select {
+    padding: 6px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 14px;
+    min-width: 120px;
+}
+
+.dnd-filter-group select:focus {
+    outline: none;
+    border-color: #007cba;
+    box-shadow: 0 0 0 2px rgba(0, 123, 186, 0.25);
+}
+
+.dnd-filter-submit {
+    padding: 8px 16px;
+    background: #007cba;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.dnd-filter-submit:hover {
+    background: #005a87;
+}
+
+.dnd-filter-submit:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 123, 186, 0.25);
+}
+
+.dnd-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    margin-top: 20px;
+}
+
+.dnd-page-link {
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+    background: #fff;
+    color: #007cba;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.dnd-page-link:hover {
+    background: #007cba;
+    color: #fff;
+    border-color: #007cba;
+}
+
+.dnd-page-link.active {
+    background: #007cba;
+    color: #fff;
+    border-color: #007cba;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .dnd-filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .dnd-filter-group {
+        width: 100%;
+    }
+
+    .dnd-filter-group select {
+        width: 100%;
+    }
+
+    .dnd-history-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+}
