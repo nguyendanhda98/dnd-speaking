@@ -220,6 +220,9 @@ jQuery(document).ready(function($) {
                     alert('Session booked successfully!');
                     $('#dnd-booking-modal').removeClass('show');
                     // Refresh upcoming sessions if needed
+                    if (typeof window.refreshStudentSessions === 'function') {
+                        window.refreshStudentSessions();
+                    }
                 } else {
                     alert('Failed to book session: ' + (response.message || 'Unknown error'));
                 }

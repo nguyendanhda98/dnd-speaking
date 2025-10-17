@@ -9,22 +9,30 @@ jQuery(document).ready(function($) {
         return;
     }
 
-    // Fetch student sessions
-    $.ajax({
-        url: dnd_speaking_data.rest_url + 'student-sessions',
-        method: 'GET',
-        headers: {
-            'X-WP-Nonce': dnd_speaking_data.nonce
-        },
-        success: function(sessions) {
-            console.log('Student sessions loaded:', sessions); // Debug log
-            renderSessions(sessions);
-        },
-        error: function(xhr, status, error) {
-            console.error('Error loading student sessions:', xhr.responseText, status, error); // Debug log
-            $sessionsList.html('<p>Không thể tải lịch học. Vui lòng kiểm tra console để biết chi tiết.</p>');
-        }
-    });
+    // Function to fetch and render student sessions
+    function fetchStudentSessions() {
+        $.ajax({
+            url: dnd_speaking_data.rest_url + 'student-sessions',
+            method: 'GET',
+            headers: {
+                'X-WP-Nonce': dnd_speaking_data.nonce
+            },
+            success: function(sessions) {
+                console.log('Student sessions loaded:', sessions); // Debug log
+                renderSessions(sessions);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading student sessions:', xhr.responseText, status, error); // Debug log
+                $sessionsList.html('<p>Không thể tải lịch học. Vui lòng kiểm tra console để biết chi tiết.</p>');
+            }
+        });
+    }
+
+    // Initial load
+    fetchStudentSessions();
+
+    // Expose refresh function globally
+    window.refreshStudentSessions = fetchStudentSessions;
 
     function renderSessions(sessions) {
         if (sessions.length === 0) {
@@ -64,6 +72,9 @@ jQuery(document).ready(function($) {
         $.ajax({
             url: dnd_speaking_data.rest_url + 'cancel-session',
             method: 'POST',
+            headers: {
+                'X-WP-Nonce': dnd_speaking_data.nonce
+            },
             data: {
                 session_id: sessionId
             },

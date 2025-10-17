@@ -76,8 +76,8 @@ class DND_Speaking_Upcoming_Sessions_Block {
             "SELECT s.*, u.display_name as student_name
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} u ON s.student_id = u.ID
-             WHERE s.teacher_id = %d AND s.status = 'confirmed' AND s.session_date >= CURDATE()
-             ORDER BY s.session_date ASC, s.session_time ASC",
+             WHERE s.teacher_id = %d AND s.status = 'confirmed' AND DATE(s.start_time) >= CURDATE()
+             ORDER BY s.start_time ASC",
             $user_id
         ));
 
@@ -89,9 +89,8 @@ class DND_Speaking_Upcoming_Sessions_Block {
         } else {
             $output .= '<div class="dnd-sessions-list">';
             foreach ($upcoming_sessions as $session) {
-                $session_datetime = $session->session_date . ' ' . $session->session_time;
-                $formatted_date = date('M j, Y', strtotime($session->session_date));
-                $formatted_time = date('g:i A', strtotime($session->session_time));
+                $formatted_date = date('M j, Y', strtotime($session->start_time));
+                $formatted_time = date('g:i A', strtotime($session->start_time));
 
                 $output .= '<div class="dnd-session-item" data-session-id="' . $session->id . '">';
                 $output .= '<div class="dnd-session-info">';

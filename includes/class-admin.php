@@ -421,9 +421,9 @@ class DND_Speaking_Admin {
 
         $result = $wpdb->update(
             $sessions_table,
-            ['status' => $new_status, 'updated_at' => current_time('mysql')],
+            ['status' => $new_status],
             ['id' => $session_id],
-            ['%s', '%s'],
+            ['%s'],
             ['%d']
         );
 
@@ -469,12 +469,12 @@ class DND_Speaking_Admin {
         }
 
         if ($action === 'start') {
-            // Update session status to 'in_progress'
+            // Update session status to 'active'
             $result = $wpdb->update(
                 $sessions_table,
-                ['status' => 'in_progress', 'updated_at' => current_time('mysql')],
+                ['status' => 'active'],
                 ['id' => $session_id],
-                ['%s', '%s'],
+                ['%s'],
                 ['%d']
             );
 
@@ -482,15 +482,15 @@ class DND_Speaking_Admin {
                 wp_send_json_error('Failed to start session');
             }
 
-            wp_send_json_success(['status' => 'in_progress', 'action' => 'started']);
+            wp_send_json_success(['status' => 'active', 'action' => 'started']);
 
         } elseif ($action === 'cancel') {
             // Update session status to 'cancelled'
             $result = $wpdb->update(
                 $sessions_table,
-                ['status' => 'cancelled', 'updated_at' => current_time('mysql')],
+                ['status' => 'cancelled'],
                 ['id' => $session_id],
-                ['%s', '%s'],
+                ['%s'],
                 ['%d']
             );
 

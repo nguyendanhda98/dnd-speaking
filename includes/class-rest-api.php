@@ -224,13 +224,37 @@ class DND_Speaking_REST_API {
             $day_key = isset($day_names[$slot_day_of_week - 1]) ? $day_names[$slot_day_of_week - 1] : null;
             
             if ($day_key && isset($weekly_schedule[$day_key]) && $weekly_schedule[$day_key]['enabled']) {
-                $day_start = strtotime($weekly_schedule[$day_key]['start']);
-                $day_end = strtotime($weekly_schedule[$day_key]['end']);
                 $slot_timestamp = strtotime($slot_time);
                 
-                // Check if slot is within available time and at least 30 minutes before end
-                if ($slot_timestamp >= $day_start && $slot_timestamp <= strtotime('-30 minutes', $day_end)) {
-                    $is_valid_slot = true;
+                // Check if time_slots exist (new format)
+                if (isset($weekly_schedule[$day_key]['time_slots']) && is_array($weekly_schedule[$day_key]['time_slots'])) {
+                    foreach ($weekly_schedule[$day_key]['time_slots'] as $time_slot) {
+                        if (!isset($time_slot['start']) || !isset($time_slot['end'])) {
+                            continue;
+                        }
+                        $day_start = strtotime($time_slot['start']);
+                        $day_end = strtotime($time_slot['end']);
+                        // Check if slot is within available time and at least 30 minutes before end
+                        if ($slot_timestamp >= $day_start && $slot_timestamp <= strtotime('-30 minutes', $day_end)) {
+                            $is_valid_slot = true;
+                            break;
+                        }
+                    }
+                } elseif (isset($weekly_schedule[$day_key]['start']) && isset($weekly_schedule[$day_key]['end'])) {
+                    // Backward compatibility for old format
+                    $day_start = strtotime($weekly_schedule[$day_key]['start']);
+                    $day_end = strtotime($weekly_schedule[$day_key]['end']);
+                    // Check if slot is within available time and at least 30 minutes before end
+                    if ($slot_timestamp >= $day_start && $slot_timestamp <= strtotime('-30 minutes', $day_end)) {
+                        $is_valid_slot = true;
+                    }
+                } else {
+                    // Default fallback
+                    $day_start = strtotime('09:00');
+                    $day_end = strtotime('17:00');
+                    if ($slot_timestamp >= $day_start && $slot_timestamp <= strtotime('-30 minutes', $day_end)) {
+                        $is_valid_slot = true;
+                    }
                 }
             }
         } else {

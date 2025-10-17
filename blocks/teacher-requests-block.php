@@ -77,7 +77,7 @@ class DND_Speaking_Teacher_Requests_Block {
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} u ON s.student_id = u.ID
              WHERE s.teacher_id = %d AND s.status = 'pending'
-             ORDER BY s.created_at DESC",
+             ORDER BY s.start_time DESC",
             $user_id
         ));
 
@@ -92,7 +92,7 @@ class DND_Speaking_Teacher_Requests_Block {
                 $output .= '<div class="dnd-request-item" data-session-id="' . $request->id . '">';
                 $output .= '<div class="dnd-request-info">';
                 $output .= '<div class="dnd-student-name">' . esc_html($request->student_name) . '</div>';
-                $output .= '<div class="dnd-request-time">Requested: ' . date('M j, Y g:i A', strtotime($request->created_at)) . '</div>';
+                $output .= '<div class="dnd-request-time">Requested: ' . date('M j, Y g:i A', strtotime($request->start_time)) . '</div>';
                 $output .= '</div>';
                 $output .= '<div class="dnd-request-actions">';
                 $output .= '<button class="dnd-btn dnd-btn-accept" data-action="accept">Accept</button>';

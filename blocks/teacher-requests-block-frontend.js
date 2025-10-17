@@ -50,6 +50,18 @@ jQuery(document).ready(function($) {
                         });
                     }, 1500);
 
+                    // Refresh student sessions if function exists
+                    if (typeof window.refreshStudentSessions === 'function') {
+                        setTimeout(function() {
+                            window.refreshStudentSessions();
+                        }, 500);
+                    }
+
+                    // Refresh page to update upcoming sessions block
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+
                 } else {
                     // Show error message
                     requestItem.append('<div class="dnd-request-message error">' + (response.data || 'An error occurred') + '</div>');
