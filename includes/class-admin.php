@@ -513,24 +513,52 @@ class DND_Speaking_Admin {
         echo '<input type="text" name="dnd_discord_server_id" value="' . esc_attr($value) . '" class="regular-text" />';
     }
 
+    public function check_discord_bot_token($token) {
+        if (empty($token)) {
+            return 'No token provided';
+        }
+        $response = wp_remote_get('https://discord.com/api/v10/users/@me', array(
+            'headers' => array(
+                'Authorization' => 'Bot ' . $token,
+                'User-Agent' => 'DND Speaking Plugin/1.0'
+            ),
+            'timeout' => 10
+        ));
+        if (is_wp_error($response)) {
+            return 'Connection error: ' . $response->get_error_message();
+        }
+        $code = wp_remote_retrieve_response_code($response);
+        if ($code === 200) {
+            return true; // Valid
+        } else {
+            $body = wp_remote_retrieve_body($response);
+            $data = json_decode($body, true);
+            if (isset($data['message'])) {
+                return 'Error: ' . $data['message'];
+            } else {
+                return 'Error: HTTP ' . $code;
+            }
+        }
+    }
+
     public function display_bot_status() {
         $bot_token = get_option('dnd_discord_bot_token', '');
-        $server_id = get_option('dnd_discord_server_id', '');
         $connect_to_bot = get_option('dnd_discord_connect_to_bot', '');
 
-        $status = 'disconnected';
-        $status_text = 'Bot Disconnected';
-        $color = 'red';
-
-        if (!empty($bot_token) && !empty($server_id) && $connect_to_bot) {
-            // Here you would add logic to verify the bot token and server connection
-            // For now, assume connected if all fields are filled
-            $status = 'connected';
-            $status_text = 'Bot Connected';
+        $check = $this->check_discord_bot_token($bot_token);
+        if ($check === true && $connect_to_bot) {
+            $status_text = 'Connected';
             $color = 'green';
+        } else {
+            if ($check === true) {
+                $status_text = 'Token valid but not connected';
+            } else {
+                $status_text = $check; // Error message
+            }
+            $color = 'red';
         }
 
-        echo '<strong style="color: ' . $color . ';">' . $status_text . '</strong>';
+        echo '<strong>Bot status: <span style="color: ' . $color . ';">' . $status_text . '</span></strong>';
     }
 
     public function validate_discord_bot_token($new_value, $old_value) {
