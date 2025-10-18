@@ -17,8 +17,6 @@ foreach (glob(plugin_dir_path(__FILE__) . 'includes/*.php') as $file) {
 require_once plugin_dir_path(__FILE__) . 'blocks/credits-block.php';
 require_once plugin_dir_path(__FILE__) . 'blocks/teachers-block.php';
 require_once plugin_dir_path(__FILE__) . 'blocks/teacher-header-block.php';
-require_once plugin_dir_path(__FILE__) . 'blocks/teacher-requests-block.php';
-require_once plugin_dir_path(__FILE__) . 'blocks/upcoming-sessions-block.php';
 require_once plugin_dir_path(__FILE__) . 'blocks/schedule-settings-block.php';
 require_once plugin_dir_path(__FILE__) . 'blocks/session-history-block.php';
 require_once plugin_dir_path(__FILE__) . 'blocks/feedback-block.php';
