@@ -1,118 +1,84 @@
-/**
- * Session History Block - Frontend JavaScript with AJAX
- */
-
 jQuery(document).ready(function($) {
-    'use strict';
+    const $historyBlock = $('.dnd-session-history');
+    const $historyList = $('#dnd-session-history-list');
 
-    var $historyContainer = $('.dnd-session-history');
-    var $filterForm = $('#dnd-history-filter-form');
-    var currentPage = 1;
-    var currentStatusFilter = 'all';
-    var currentPerPage = 10;
+    if ($historyBlock.length === 0) return;
 
-    // Initialize current values from URL or defaults
-    var urlParams = new URLSearchParams(window.location.search);
-    currentPage = parseInt(urlParams.get('history_page')) || 1;
-    currentStatusFilter = urlParams.get('status_filter') || 'all';
-    currentPerPage = parseInt(urlParams.get('per_page')) || 10;
+    // Check if user is logged in
+    if (!dnd_session_history_data.user_id) {
+        $historyList.html('<p>Vui lòng đăng nhập để xem lịch sử buổi học.</p>');
+        return;
+    }
 
-    // Load initial content
+    let currentFilter = $historyList.data('filter') || 'all';
+    let currentPerPage = $historyList.data('per-page') || 10;
+    let currentPage = $historyList.data('page') || 1;
+
+    // Set initial select value
+    $('#session_history_per_page').val(currentPerPage);
+
+    // Initial load
     loadSessionHistory();
 
-    // Handle filter form submission
-    $filterForm.on('submit', function(e) {
-        e.preventDefault();
-
-        var formData = new FormData(this);
-        currentStatusFilter = formData.get('status_filter');
-        currentPerPage = parseInt(formData.get('per_page'));
-        currentPage = 1; // Reset to first page when filtering
-
-        loadSessionHistory();
-        updateURL();
+    // Handle filter buttons
+    $historyBlock.on('click', '.dnd-filter-btn', function() {
+        const filter = $(this).data('filter');
+        if (filter !== currentFilter) {
+            currentFilter = filter;
+            currentPage = 1; // Reset to first page
+            loadSessionHistory();
+        }
     });
 
-    // Handle pagination clicks
-    $historyContainer.on('click', '.dnd-page-link', function(e) {
+    // Handle per page change
+    $historyBlock.on('change', '#session_history_per_page', function() {
+        currentPerPage = parseInt($(this).val());
+        currentPage = 1; // Reset to first page
+        loadSessionHistory();
+    });
+
+    // Handle pagination
+    $historyBlock.on('click', '.dnd-page-link', function(e) {
         e.preventDefault();
-        var page = $(this).data('page');
-        if (page) {
+        const page = $(this).data('page');
+        if (page && page !== currentPage) {
             currentPage = parseInt(page);
             loadSessionHistory();
-            updateURL();
         }
     });
 
     function loadSessionHistory() {
-        // Show loading state
-        var $contentArea = $historyContainer.find('.dnd-history-content');
-        $contentArea.html('<div class="dnd-loading" style="text-align: center; padding: 40px;">Loading...</div>');
+        $historyList.html('<div class="dnd-loading">Loading...</div>');
 
         $.ajax({
             url: dnd_session_history_data.ajax_url,
-            type: 'POST',
+            method: 'POST',
             data: {
                 action: 'get_session_history',
-                page: currentPage,
+                filter: currentFilter,
                 per_page: currentPerPage,
-                status_filter: currentStatusFilter,
+                page: currentPage,
                 nonce: dnd_session_history_data.nonce
-            },
-            beforeSend: function(xhr) {
-                console.log('Teacher AJAX Request - Action: get_session_history');
-                console.log('Teacher AJAX Request - Page:', currentPage);
-                console.log('Teacher AJAX Request - Filter:', currentStatusFilter);
-                console.log('Teacher AJAX Request - Nonce:', dnd_session_history_data.nonce);
-                console.log('Teacher AJAX Request - User ID:', dnd_session_history_data.user_id);
             },
             success: function(response) {
                 if (response.success) {
-                    // Replace the content area with new HTML
-                    $contentArea.html(response.html);
+                    console.log('AJAX Response:', response);
+                    console.log('Total sessions:', response.pagination.total_sessions, 'Total pages:', response.pagination.total_pages);
+                    $historyList.html(response.html);
+                    updateFilterButtons();
                 } else {
-                    console.error('Error loading session history:', response);
-                    $contentArea.html('<div class="dnd-error" style="text-align: center; padding: 40px; color: #dc3545;">Error loading data. Please try again.</div>');
+                    $historyList.html('<p>Có lỗi xảy ra khi tải dữ liệu.</p>');
                 }
             },
             error: function(xhr, status, error) {
-                console.error('AJAX Error:', error);
-                if (xhr.status === 401 || xhr.status === 403) {
-                    $contentArea.html('<div class="dnd-error" style="text-align: center; padding: 40px; color: #dc3545;">Please log in to view your session history.</div>');
-                } else {
-                    $contentArea.html('<div class="dnd-error" style="text-align: center; padding: 40px; color: #dc3545;">Error loading data. Please try again.</div>');
-                }
+                console.error('Error loading session history:', xhr.responseText, status, error);
+                $historyList.html('<p>Có lỗi xảy ra khi tải dữ liệu.</p>');
             }
         });
     }
 
-    function updateURL() {
-        var url = new URL(window.location);
-        url.searchParams.set('history_page', currentPage);
-        if (currentStatusFilter !== 'all') {
-            url.searchParams.set('status_filter', currentStatusFilter);
-        } else {
-            url.searchParams.delete('status_filter');
-        }
-        url.searchParams.set('per_page', currentPerPage);
-
-        // Update URL without reloading page
-        window.history.pushState({}, '', url);
+    function updateFilterButtons() {
+        $('.dnd-filter-btn').removeClass('active');
+        $('.dnd-filter-btn[data-filter="' + currentFilter + '"]').addClass('active');
     }
-
-    // Handle browser back/forward buttons
-    window.addEventListener('popstate', function() {
-        var urlParams = new URLSearchParams(window.location.search);
-        currentPage = parseInt(urlParams.get('history_page')) || 1;
-        currentStatusFilter = urlParams.get('status_filter') || 'all';
-        currentPerPage = parseInt(urlParams.get('per_page')) || 10;
-
-        // Update form values
-        $filterForm.find('select[name="status_filter"]').val(currentStatusFilter);
-        $filterForm.find('select[name="per_page"]').val(currentPerPage);
-
-        loadSessionHistory();
-    });
-
-    console.log('Session History Block with AJAX loaded');
 });

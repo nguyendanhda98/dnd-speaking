@@ -234,7 +234,7 @@ class DND_Speaking_REST_API {
         error_log('AJAX Session History - Handler called for teacher');
         try {
             // Verify nonce
-            if (!wp_verify_nonce($_POST['nonce'], 'session_history_nonce')) {
+            if (!wp_verify_nonce($_POST['nonce'], 'wp_rest')) {
                 wp_send_json_error('Security check failed');
                 return;
             }
@@ -247,14 +247,14 @@ class DND_Speaking_REST_API {
 
             $page = intval($_POST['page']) ?: 1;
             $per_page = intval($_POST['per_page']) ?: 10;
-            $status_filter = sanitize_text_field($_POST['status_filter']) ?: 'all';
+            $status_filter = sanitize_text_field($_POST['filter']) ?: 'all';
 
             $allowed_per_page = [1, 3, 5, 10];
             if (!in_array($per_page, $allowed_per_page)) {
                 $per_page = 10;
             }
 
-            $allowed_filters = ['all', 'completed', 'cancelled'];
+            $allowed_filters = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
             if (!in_array($status_filter, $allowed_filters)) {
                 $status_filter = 'all';
             }
@@ -266,11 +266,22 @@ class DND_Speaking_REST_API {
             $where_clause = "s.teacher_id = %d";
             $query_params = [$user_id];
 
-            if ($status_filter !== 'all') {
-                $where_clause .= " AND s.status = %s";
-                $query_params[] = $status_filter;
-            } else {
-                $where_clause .= " AND s.status IN ('completed', 'cancelled')";
+            switch ($status_filter) {
+                case 'pending':
+                    $where_clause .= " AND s.status = 'pending'";
+                    break;
+                case 'confirmed':
+                    $where_clause .= " AND s.status = 'confirmed'";
+                    break;
+                case 'completed':
+                    $where_clause .= " AND s.status = 'completed'";
+                    break;
+                case 'cancelled':
+                    $where_clause .= " AND s.status = 'cancelled'";
+                    break;
+                default:
+                    // All: include all statuses
+                    break;
             }
 
             global $wpdb;
@@ -338,20 +349,15 @@ class DND_Speaking_REST_API {
 
                 // Pagination
                 if ($total_pages > 1) {
-                    $filter_param = $status_filter !== 'all' ? '&status_filter=' . $status_filter : '';
-                    $per_page_param = '&per_page=' . $per_page;
                     $output .= '<div class="dnd-pagination">';
-                    if ($page > 1) {
-                        $output .= '<a href="#" data-page="' . ($page - 1) . '" class="dnd-page-link">Previous</a>';
-                    }
-
-                    for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++) {
-                        $active_class = ($i === $page) ? ' active' : '';
-                        $output .= '<a href="#" data-page="' . $i . '" class="dnd-page-link' . $active_class . '">' . $i . '</a>';
-                    }
-
-                    if ($page < $total_pages) {
-                        $output .= '<a href="#" data-page="' . ($page + 1) . '" class="dnd-page-link">Next</a>';
+                    $pages = $this->get_pagination_links($page, $total_pages);
+                    foreach ($pages as $p) {
+                        if ($p === '...') {
+                            $output .= '<span class="dnd-page-dots">...</span>';
+                        } else {
+                            $active = ($p == $page) ? ' active' : '';
+                            $output .= '<a href="#" class="dnd-page-link' . $active . '" data-page="' . $p . '">' . $p . '</a>';
+                        }
                     }
                     $output .= '</div>';
                 }
