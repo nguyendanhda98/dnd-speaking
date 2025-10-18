@@ -77,7 +77,7 @@ class DND_Speaking_Feedback_Block {
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} u ON s.student_id = u.ID
              WHERE s.teacher_id = %d AND s.status = 'completed' AND s.feedback IS NOT NULL AND s.feedback != ''
-             ORDER BY s.session_date DESC, s.session_time DESC
+             ORDER BY s.start_time DESC
              LIMIT 20",
             $user_id
         ));

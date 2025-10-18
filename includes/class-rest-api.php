@@ -138,7 +138,7 @@ class DND_Speaking_REST_API {
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} u ON s.teacher_id = u.ID
              WHERE $where_clause
-             ORDER BY s.session_date DESC, s.session_time DESC
+             ORDER BY s.start_time DESC
              LIMIT %d OFFSET %d",
             array_merge($query_params, [$per_page, $offset])
         ));
@@ -293,7 +293,7 @@ class DND_Speaking_REST_API {
                  FROM $sessions_table s
                  LEFT JOIN {$wpdb->users} u ON s.student_id = u.ID
                  WHERE $where_clause
-                 ORDER BY s.session_date DESC, s.session_time DESC
+                 ORDER BY s.start_time DESC
                  LIMIT %d OFFSET %d",
                 array_merge($query_params, [$per_page, $offset])
             ));
@@ -828,7 +828,7 @@ class DND_Speaking_REST_API {
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} u ON s.student_id = u.ID
              WHERE $where_clause
-             ORDER BY s.session_date DESC, s.session_time DESC
+             ORDER BY s.start_time DESC
              LIMIT %d OFFSET %d",
             array_merge($query_params, [$per_page, $offset])
         ));
@@ -981,7 +981,7 @@ class DND_Speaking_REST_API {
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} t ON s.teacher_id = t.ID
              WHERE $where_clause
-             ORDER BY s.session_date DESC, s.session_time DESC
+             ORDER BY s.start_time DESC
              LIMIT %d OFFSET %d",
             array_merge($query_params, [$per_page, $offset])
         ));
@@ -1184,13 +1184,7 @@ class DND_Speaking_REST_API {
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} t ON s.teacher_id = t.ID
              WHERE $where_clause
-             ORDER BY 
-                 CASE 
-                     WHEN s.status IN ('pending', 'confirmed', 'in_progress') THEN 1
-                     WHEN s.status = 'completed' THEN 2
-                     ELSE 3
-                 END,
-                 s.session_date DESC, s.session_time DESC
+             ORDER BY s.start_time DESC
              LIMIT %d OFFSET %d",
             array_merge($query_params, [$per_page, $offset])
         ));

@@ -102,7 +102,7 @@ class DND_Speaking_Student_Session_History_Block {
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} t ON s.teacher_id = t.ID
              WHERE $where_clause
-             ORDER BY s.session_date DESC, s.session_time DESC
+             ORDER BY s.start_time DESC
              LIMIT %d OFFSET %d",
             array_merge($query_params, [$per_page, $offset])
         ));

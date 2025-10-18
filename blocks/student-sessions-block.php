@@ -148,13 +148,7 @@ class DND_Speaking_Student_Sessions_Block {
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} t ON s.teacher_id = t.ID
              WHERE $where_clause
-             ORDER BY 
-                 CASE 
-                     WHEN s.status IN ('pending', 'confirmed', 'in_progress') THEN 1
-                     WHEN s.status = 'completed' THEN 2
-                     ELSE 3
-                 END,
-                 s.session_date DESC, s.session_time DESC
+             ORDER BY s.start_time DESC
              LIMIT %d OFFSET %d",
             array_merge($query_params, [$per_page, $offset])
         ));
