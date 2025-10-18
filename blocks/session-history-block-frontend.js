@@ -81,4 +81,70 @@ jQuery(document).ready(function($) {
         $('.dnd-filter-btn').removeClass('active');
         $('.dnd-filter-btn[data-filter="' + currentFilter + '"]').addClass('active');
     }
+
+    // Handle action buttons
+    $historyBlock.on('click', '.dnd-btn-confirm', function() {
+        const sessionId = $(this).data('session-id');
+        if (confirm('Bạn có chắc muốn xác nhận buổi học này?')) {
+            updateSessionStatus(sessionId, 'confirmed');
+        }
+    });
+
+    $historyBlock.on('click', '.dnd-btn-reject', function() {
+        const sessionId = $(this).data('session-id');
+        if (confirm('Bạn có chắc muốn từ chối buổi học này?')) {
+            updateSessionStatus(sessionId, 'cancelled');
+        }
+    });
+
+    $historyBlock.on('click', '.dnd-btn-cancel', function() {
+        const sessionId = $(this).data('session-id');
+        if (confirm('Bạn có chắc muốn hủy buổi học này?')) {
+            updateSessionStatus(sessionId, 'cancelled');
+        }
+    });
+
+    $historyBlock.on('click', '.dnd-btn-view', function() {
+        const sessionId = $(this).data('session-id');
+        // Implement view session details
+        alert('Xem chi tiết buổi học: ' + sessionId);
+    });
+
+    $historyBlock.on('click', '.dnd-btn-start', function() {
+        const sessionId = $(this).data('session-id');
+        alert('Bắt đầu buổi học: ' + sessionId);
+        // Update status to in_progress
+        updateSessionStatus(sessionId, 'in_progress');
+    });
+
+    $historyBlock.on('click', '.dnd-btn-end', function() {
+        const sessionId = $(this).data('session-id');
+        if (confirm('Bạn có chắc muốn kết thúc buổi học này?')) {
+            updateSessionStatus(sessionId, 'completed');
+        }
+    });
+
+    function updateSessionStatus(sessionId, newStatus) {
+        $.ajax({
+            url: dnd_session_history_data.ajax_url,
+            method: 'POST',
+            data: {
+                action: 'update_session_status',
+                session_id: sessionId,
+                new_status: newStatus,
+                nonce: dnd_session_history_data.nonce
+            },
+            success: function(response) {
+                if (response.success) {
+                    loadSessionHistory(); // Reload after status update
+                } else {
+                    alert('Không thể cập nhật trạng thái buổi học. Vui lòng thử lại.');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error updating session status:', xhr.responseText, status, error);
+                alert('Có lỗi xảy ra khi cập nhật trạng thái buổi học.');
+            }
+        });
+    }
 });

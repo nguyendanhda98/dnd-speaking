@@ -11,6 +11,7 @@ class DND_Speaking_REST_API {
         add_action('wp_ajax_get_student_session_history', [$this, 'ajax_get_student_session_history']);
         add_action('wp_ajax_get_session_history', [$this, 'ajax_get_session_history']);
         add_action('wp_ajax_get_student_sessions', [$this, 'ajax_get_student_sessions']);
+        add_action('wp_ajax_update_session_status', [$this, 'ajax_update_session_status']);
     }
 
     public function register_routes() {
@@ -271,7 +272,7 @@ class DND_Speaking_REST_API {
                     $where_clause .= " AND s.status = 'pending'";
                     break;
                 case 'confirmed':
-                    $where_clause .= " AND s.status = 'confirmed'";
+                    $where_clause .= " AND s.status IN ('confirmed', 'in_progress')";
                     break;
                 case 'completed':
                     $where_clause .= " AND s.status = 'completed'";
@@ -316,8 +317,13 @@ class DND_Speaking_REST_API {
                     $formatted_date = date('M j, Y', strtotime($session->session_date));
                     $formatted_time = date('g:i A', strtotime($session->session_time));
 
-                    $status_class = $session->status === 'completed' ? 'completed' : 'cancelled';
-                    $status_text = $session->status === 'completed' ? 'Completed' : 'Cancelled';
+                    $status_class = $session->status;
+                    $status_text = ucfirst($session->status);
+                    
+                    // Custom status text for in_progress
+                    if ($session->status === 'in_progress') {
+                        $status_text = 'Đang diễn ra';
+                    }
 
                     $duration = isset($session->duration) ? $session->duration . ' min' : 'N/A';
 
@@ -343,12 +349,36 @@ class DND_Speaking_REST_API {
                         $output .= '</div>';
                     }
 
+                    // Actions based on status
+                    $output .= '<div class="dnd-session-actions">';
+                    switch ($session->status) {
+                        case 'pending':
+                            $output .= '<button class="dnd-btn dnd-btn-confirm" data-session-id="' . $session->id . '">Xác nhận</button>';
+                            $output .= '<button class="dnd-btn dnd-btn-reject" data-session-id="' . $session->id . '">Từ chối</button>';
+                            break;
+                        case 'confirmed':
+                            $output .= '<button class="dnd-btn dnd-btn-start" data-session-id="' . $session->id . '">Bắt đầu</button>';
+                            $output .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy buổi học</button>';
+                            break;
+                        case 'in_progress':
+                            $output .= '<button class="dnd-btn dnd-btn-end" data-session-id="' . $session->id . '">Kết thúc</button>';
+                            $output .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy buổi học</button>';
+                            break;
+                        case 'completed':
+                            $output .= '<button class="dnd-btn dnd-btn-view" data-session-id="' . $session->id . '">Xem chi tiết</button>';
+                            break;
+                        case 'cancelled':
+                            // No actions for cancelled sessions
+                            break;
+                    }
+                    $output .= '</div>';
+
                     $output .= '</div>';
                 }
                 $output .= '</div>';
 
-                // Pagination
-                if ($total_pages > 1) {
+                // Pagination - always show at least page 1
+                if ($total_pages >= 1) {
                     $output .= '<div class="dnd-pagination">';
                     $pages = $this->get_pagination_links($page, $total_pages);
                     foreach ($pages as $p) {
@@ -1067,6 +1097,50 @@ class DND_Speaking_REST_API {
         ];
     }
 
+    public function ajax_update_session_status() {
+        check_ajax_referer('wp_rest', 'nonce');
+
+        if (!is_user_logged_in()) {
+            wp_die('Unauthorized');
+        }
+
+        $session_id = isset($_POST['session_id']) ? intval($_POST['session_id']) : 0;
+        $new_status = isset($_POST['new_status']) ? sanitize_text_field($_POST['new_status']) : '';
+
+        if (!$session_id || !in_array($new_status, ['confirmed', 'cancelled', 'in_progress', 'completed'])) {
+            wp_send_json_error('Invalid parameters');
+        }
+
+        global $wpdb;
+        $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
+        $user_id = get_current_user_id();
+
+        // Verify that the session belongs to this teacher
+        $session = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $sessions_table WHERE id = %d AND teacher_id = %d",
+            $session_id, $user_id
+        ));
+
+        if (!$session) {
+            wp_send_json_error('Session not found or access denied');
+        }
+
+        // Update the session status
+        $result = $wpdb->update(
+            $sessions_table,
+            ['status' => $new_status],
+            ['id' => $session_id],
+            ['%s'],
+            ['%d']
+        );
+
+        if ($result !== false) {
+            wp_send_json_success('Session status updated successfully');
+        } else {
+            wp_send_json_error('Failed to update session status');
+        }
+    }
+
     public function ajax_get_student_sessions() {
         check_ajax_referer('wp_rest', 'nonce');
 
@@ -1089,7 +1163,7 @@ class DND_Speaking_REST_API {
                 $where_clause .= " AND s.status = 'pending'";
                 break;
             case 'confirmed':
-                $where_clause .= " AND s.status = 'confirmed'";
+                $where_clause .= " AND s.status IN ('confirmed', 'in_progress')";
                 break;
             case 'completed':
                 $where_clause .= " AND s.status = 'completed'";
@@ -1110,7 +1184,13 @@ class DND_Speaking_REST_API {
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} t ON s.teacher_id = t.ID
              WHERE $where_clause
-             ORDER BY s.id DESC
+             ORDER BY 
+                 CASE 
+                     WHEN s.status IN ('pending', 'confirmed', 'in_progress') THEN 1
+                     WHEN s.status = 'completed' THEN 2
+                     ELSE 3
+                 END,
+                 s.session_date DESC, s.session_time DESC
              LIMIT %d OFFSET %d",
             array_merge($query_params, [$per_page, $offset])
         ));
@@ -1125,12 +1205,12 @@ class DND_Speaking_REST_API {
             $output .= '<p>Không có buổi học nào.</p>';
         } else {
             foreach ($sessions as $session) {
-                $output .= $this->render_session_card($session);
+                $output .= $this->render_student_session_card($session);
             }
         }
 
-        // Pagination
-        if ($total_pages > 1) {
+        // Pagination - always show at least page 1
+        if ($total_pages >= 1) {
             $output .= '<div class="dnd-pagination">';
             $pages = $this->get_pagination_links($page, $total_pages);
             foreach ($pages as $p) {
@@ -1144,11 +1224,82 @@ class DND_Speaking_REST_API {
             $output .= '</div>';
         }
 
-        wp_send_json_success(['html' => $output, 'total_sessions' => $total_sessions, 'total_pages' => $total_pages]);
+        wp_send_json([
+            'success' => true,
+            'html' => $output,
+            'pagination' => [
+                'current_page' => $page,
+                'total_pages' => $total_pages,
+                'total_sessions' => $total_sessions
+            ]
+        ]);
+    }
+
+    private function render_student_session_card($session) {
+        $status_text = '';
+        $status_class = '';
+        $actions = '';
+
+        switch ($session->status) {
+            case 'pending':
+                $status_text = 'Chờ xác nhận';
+                $status_class = 'pending';
+                $actions = '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
+                break;
+            case 'confirmed':
+                $status_text = 'Đã xác nhận';
+                $status_class = 'confirmed';
+                $actions = '';
+                // Check if within 15 minutes before start
+                if (!empty($session->session_date) && !empty($session->session_time)) {
+                    $session_datetime = strtotime($session->session_date . ' ' . $session->session_time);
+                    if (time() >= ($session_datetime - 15 * 60) && time() < $session_datetime) {
+                        $actions .= '<button class="dnd-btn dnd-btn-join" data-session-id="' . $session->id . '">Tham gia ngay</button>';
+                    }
+                }
+                $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
+                break;
+            case 'in_progress':
+                $status_text = 'Đang diễn ra';
+                $status_class = 'in_progress';
+                $actions = '<button class="dnd-btn dnd-btn-join" data-session-id="' . $session->id . '">Tham gia ngay</button>';
+                $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
+                break;
+            case 'completed':
+                $status_text = 'Hoàn thành';
+                $status_class = 'completed';
+                // Check if rated
+                $actions = '<button class="dnd-btn dnd-btn-rate" data-session-id="' . $session->id . '">Đánh giá</button>';
+                $actions .= '<button class="dnd-btn dnd-btn-feedback" data-session-id="' . $session->id . '">Giáo viên phản hồi</button>';
+                break;
+            case 'cancelled':
+                $status_text = 'Đã huỷ';
+                $status_class = 'cancelled';
+                $actions = ''; // No actions for cancelled
+                break;
+        }
+
+        $scheduled_time = 'N/A';
+        if (!empty($session->session_date) && !empty($session->session_time)) {
+            $scheduled_time = date('d/m/Y H:i', strtotime($session->session_date . ' ' . $session->session_time));
+        }
+
+        return '
+            <div class="dnd-session-card" data-session-id="' . $session->id . '">
+                <div class="dnd-session-teacher">Giáo viên: ' . esc_html($session->teacher_name ?: 'N/A') . '</div>
+                <div class="dnd-session-status ' . $status_class . '">Trạng thái: ' . $status_text . '</div>
+                <div class="dnd-session-time">Thời gian: ' . $scheduled_time . '</div>
+                <div class="dnd-session-actions">' . $actions . '</div>
+            </div>
+        ';
     }
 
     private function get_pagination_links($current_page, $total_pages) {
         $links = [];
+
+        if ($total_pages <= 0) {
+            return [1]; // Always show at least page 1
+        }
 
         if ($total_pages <= 7) {
             // Show all pages if <=7
@@ -1226,10 +1377,27 @@ class DND_Speaking_REST_API {
                 $output .= '<div class="dnd-cancelled-note">Session was cancelled</div>';
                 break;
         }
-        $output .= '</div>';
+                    $output .= '</div>';
 
-        $output .= '</div>';
+                    // Actions based on status
+                    $output .= '<div class="dnd-session-actions">';
+                    switch ($session->status) {
+                        case 'pending':
+                            $output .= '<button class="dnd-btn dnd-btn-confirm" data-session-id="' . $session->id . '">Xác nhận</button>';
+                            $output .= '<button class="dnd-btn dnd-btn-reject" data-session-id="' . $session->id . '">Từ chối</button>';
+                            break;
+                        case 'confirmed':
+                            $output .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy buổi học</button>';
+                            break;
+                        case 'completed':
+                            $output .= '<button class="dnd-btn dnd-btn-view" data-session-id="' . $session->id . '">Xem chi tiết</button>';
+                            break;
+                        case 'cancelled':
+                            // No actions for cancelled sessions
+                            break;
+                    }
+                    $output .= '</div>';
 
-        return $output;
+                    $output .= '</div>';        return $output;
     }
 }

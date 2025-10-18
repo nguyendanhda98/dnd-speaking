@@ -133,7 +133,7 @@ class DND_Speaking_Session_History_Block {
                 $where_clause .= " AND status = 'pending'";
                 break;
             case 'confirmed':
-                $where_clause .= " AND status = 'confirmed'";
+                $where_clause .= " AND status IN ('confirmed', 'in_progress')";
                 break;
             case 'completed':
                 $where_clause .= " AND status = 'completed'";

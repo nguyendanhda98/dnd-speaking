@@ -150,7 +150,7 @@ class DND_Speaking_Student_Sessions_Block {
              WHERE $where_clause
              ORDER BY 
                  CASE 
-                     WHEN s.status IN ('pending', 'confirmed') THEN 1
+                     WHEN s.status IN ('pending', 'confirmed', 'in_progress') THEN 1
                      WHEN s.status = 'completed' THEN 2
                      ELSE 3
                  END,
@@ -184,7 +184,7 @@ class DND_Speaking_Student_Sessions_Block {
                 $where_clause .= " AND status = 'pending'";
                 break;
             case 'confirmed':
-                $where_clause .= " AND status = 'confirmed'";
+                $where_clause .= " AND status IN ('confirmed', 'in_progress')";
                 break;
             case 'completed':
                 $where_clause .= " AND status = 'completed'";

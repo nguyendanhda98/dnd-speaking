@@ -59,7 +59,7 @@ jQuery(document).ready(function($) {
     $sessionsBlock.on('click', '.dnd-btn-join', function() {
         const sessionId = $(this).data('session-id');
         // Implement join logic, e.g., open meeting link
-        alert('Tham gia buổi học: ' + sessionId);
+        alert('Đã click tham gia buổi học');
     });
 
     // Handle rate buttons
@@ -92,8 +92,8 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.success) {
                     console.log('AJAX Response:', response);
-                    console.log('Total sessions:', response.data.total_sessions, 'Total pages:', response.data.total_pages);
-                    $sessionsList.html(response.data.html);
+                    console.log('Total sessions:', response.pagination.total_sessions, 'Total pages:', response.pagination.total_pages);
+                    $sessionsList.html(response.html);
                     updateFilterButtons();
                 } else {
                     $sessionsList.html('<p>Có lỗi xảy ra khi tải dữ liệu.</p>');
