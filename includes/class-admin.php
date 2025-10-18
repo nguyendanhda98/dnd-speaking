@@ -9,6 +9,7 @@ class DND_Speaking_Admin {
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_notices', [$this, 'display_admin_notices']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
         add_action('wp_ajax_update_teacher_availability', [$this, 'update_teacher_availability']);
         add_action('wp_ajax_handle_teacher_request', [$this, 'handle_teacher_request']);
         add_action('wp_ajax_handle_upcoming_session', [$this, 'handle_upcoming_session']);
@@ -302,8 +303,12 @@ class DND_Speaking_Admin {
                         </div>
                         <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
                             <label for="dnd_discord_redirect_url" style="width: 150px; font-weight: bold;">Redirect URL</label>
-                            <input type="url" id="dnd_discord_redirect_url" name="dnd_discord_redirect_url" value="<?php echo esc_attr(get_option('dnd_discord_redirect_url')); ?>" style="max-width: 300px;" />
+                            <div style="position: relative; width: 300px;">
+                                <input type="text" id="dnd_discord_redirect_url_display" value="<?php echo esc_attr(get_site_url() . '/wp-json/dnd-speaking/v1/discord/callback'); ?>" class="regular-text dnd-discord-redirect-input" readonly style="background-color: #f5f5f5; width: 100%; cursor: pointer; box-sizing: border-box;" />
+                                <span class="dashicons dashicons-yes dnd-copy-feedback" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #46b450; display: none;"></span>
+                            </div>
                         </div>
+                        <p class="description" style="margin-left: 160px; margin-top: -10px;">Click the URL above to copy it to clipboard, then paste into your Discord app's OAuth2 Redirect URIs.</p>
                         <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
                             <label for="dnd_discord_admin_redirect_url" style="width: 150px; font-weight: bold;">Admin Redirect URL</label>
                             <input type="url" id="dnd_discord_admin_redirect_url" name="dnd_discord_admin_redirect_url" value="<?php echo esc_attr(get_option('dnd_discord_admin_redirect_url')); ?>" style="max-width: 300px;" />
@@ -343,6 +348,9 @@ class DND_Speaking_Admin {
         register_setting('dnd_speaking_settings', 'dnd_session_duration');
         register_setting('dnd_speaking_settings', 'dnd_default_credits');
         register_setting('dnd_speaking_settings', 'dnd_teacher_role');
+        register_setting('dnd_speaking_settings', 'dnd_discord_client_id');
+        register_setting('dnd_speaking_settings', 'dnd_discord_client_secret');
+        register_setting('dnd_speaking_settings', 'dnd_discord_bot_token');
 
         add_settings_section(
             'dnd_speaking_main',
@@ -373,6 +381,37 @@ class DND_Speaking_Admin {
             [$this, 'teacher_role_field'],
             'dnd_speaking_settings',
             'dnd_speaking_main'
+        );
+
+        add_settings_section(
+            'dnd_speaking_discord',
+            'Discord Integration',
+            null,
+            'dnd_speaking_settings'
+        );
+
+        add_settings_field(
+            'discord_client_id',
+            'Discord Client ID',
+            [$this, 'discord_client_id_field'],
+            'dnd_speaking_settings',
+            'dnd_speaking_discord'
+        );
+
+        add_settings_field(
+            'discord_client_secret',
+            'Discord Client Secret',
+            [$this, 'discord_client_secret_field'],
+            'dnd_speaking_settings',
+            'dnd_speaking_discord'
+        );
+
+        add_settings_field(
+            'discord_bot_token',
+            'Discord Bot Token',
+            [$this, 'discord_bot_token_field'],
+            'dnd_speaking_settings',
+            'dnd_speaking_discord'
         );
 
         // Discord settings
@@ -455,6 +494,11 @@ class DND_Speaking_Admin {
         );
     }
 
+    public function enqueue_admin_scripts($hook) {
+        // Load on all admin pages for now to debug
+        wp_enqueue_script('dnd-discord-settings', plugin_dir_url(__FILE__) . '../assets/js/discord-settings.js', ['jquery'], '1.0.0', true);
+    }
+
     public function session_duration_field() {
         $value = get_option('dnd_session_duration', 25);
         echo '<input type="number" name="dnd_session_duration" value="' . esc_attr($value) . '" />';
@@ -489,8 +533,12 @@ class DND_Speaking_Admin {
     }
 
     public function discord_redirect_url_field() {
-        $value = get_option('dnd_discord_redirect_url', '');
-        echo '<input type="url" name="dnd_discord_redirect_url" value="' . esc_attr($value) . '" class="regular-text" />';
+        $redirect_url = get_site_url() . '/wp-json/dnd-speaking/v1/discord/callback';
+        echo '<div style="display: flex; align-items: center; gap: 10px;">';
+        echo '<input type="text" value="' . esc_attr($redirect_url) . '" class="regular-text" readonly style="background-color: #f5f5f5;" />';
+        echo '<span class="dashicons dashicons-editor-help dnd-discord-help" style="cursor: pointer; color: #007cba;" title="Click to copy this URL to clipboard"></span>';
+        echo '</div>';
+        echo '<p class="description">This is the required OAuth2 redirect URI for Discord authentication. Click the help icon to copy it, then paste into your Discord app\'s OAuth2 Redirect URIs.</p>';
     }
 
     public function discord_admin_redirect_url_field() {

@@ -1,0 +1,32 @@
+.dnd-discord-connect-block {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.dnd-btn-discord {
+    background-color: #5865f2;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.dnd-btn-discord:hover {
+    background-color: #4752c4;
+}
+
+.dnd-btn-disconnect {
+    background-color: #dc3545;
+}
+
+.dnd-btn-disconnect:hover {
+    background-color: #c82333;
+}
+
+#dnd-discord-status {
+    margin-top: 10px;
+    font-size: 14px;
+}
