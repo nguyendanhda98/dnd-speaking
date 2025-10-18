@@ -558,7 +558,10 @@ class DND_Speaking_Admin {
             $color = 'red';
         }
 
-        echo '<strong>Bot status: <span style="color: ' . $color . ';">' . $status_text . '</span></strong>';
+        echo '<div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+            <label style="width: 150px; font-weight: bold;">Bot status</label>
+            <span style="color: ' . $color . ';">' . $status_text . '</span>
+        </div>';
     }
 
     public function validate_discord_bot_token($new_value, $old_value) {
