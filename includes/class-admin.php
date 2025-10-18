@@ -292,7 +292,7 @@ class DND_Speaking_Admin {
                     settings_fields('dnd_speaking_discord_settings');
                     if ($active_sub_tab == 'app_details') {
                         ?>
-                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px; margin-top: 10px;">
                             <label for="dnd_discord_client_id" style="width: 150px; font-weight: bold;">Client ID</label>
                             <input type="text" id="dnd_discord_client_id" name="dnd_discord_client_id" value="<?php echo esc_attr(get_option('dnd_discord_client_id')); ?>" style="max-width: 300px;" />
                         </div>
