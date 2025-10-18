@@ -1,7 +1,8 @@
 jQuery(document).ready(function($) {
+    const $sessionsBlock = $('.dnd-student-sessions-block');
     const $sessionsList = $('#dnd-student-sessions-list');
 
-    if ($sessionsList.length === 0) return;
+    if ($sessionsBlock.length === 0) return;
 
     // Check if user is logged in
     if (!dnd_speaking_data.user_id) {
@@ -9,66 +10,108 @@ jQuery(document).ready(function($) {
         return;
     }
 
-    // Function to fetch and render student sessions
-    function fetchStudentSessions() {
-        $.ajax({
-            url: dnd_speaking_data.rest_url + 'student-sessions',
-            method: 'GET',
-            headers: {
-                'X-WP-Nonce': dnd_speaking_data.nonce
-            },
-            success: function(sessions) {
-                console.log('Student sessions loaded:', sessions); // Debug log
-                renderSessions(sessions);
-            },
-            error: function(xhr, status, error) {
-                console.error('Error loading student sessions:', xhr.responseText, status, error); // Debug log
-                $sessionsList.html('<p>Không thể tải lịch học. Vui lòng kiểm tra console để biết chi tiết.</p>');
-            }
-        });
-    }
+    let currentFilter = $sessionsList.data('filter') || 'all';
+    let currentPerPage = $sessionsList.data('per-page') || 10;
+    let currentPage = $sessionsList.data('page') || 1;
+
+    // Set initial select value
+    $('#student_sessions_per_page').val(currentPerPage);
 
     // Initial load
-    fetchStudentSessions();
+    loadSessions();
 
-    // Expose refresh function globally
-    window.refreshStudentSessions = fetchStudentSessions;
-
-    function renderSessions(sessions) {
-        if (sessions.length === 0) {
-            $sessionsList.html('<p>Bạn chưa có buổi học nào sắp tới.</p>');
-            return;
+    // Handle filter buttons
+    $sessionsBlock.on('click', '.dnd-filter-btn', function() {
+        const filter = $(this).data('filter');
+        if (filter !== currentFilter) {
+            currentFilter = filter;
+            currentPage = 1; // Reset to first page
+            loadSessions();
         }
+    });
 
-        const html = sessions.map(session => {
-            const statusText = session.status === 'pending' ? 'Chờ xác nhận' : 'Đã xác nhận';
-            const statusClass = session.status === 'pending' ? 'pending' : 'confirmed';
-            const scheduledTime = new Date(session.scheduled_time).toLocaleString('vi-VN');
+    // Handle per page change
+    $sessionsBlock.on('change', '#student_sessions_per_page', function() {
+        currentPerPage = parseInt($(this).val());
+        currentPage = 1; // Reset to first page
+        loadSessions();
+    });
 
-            return `
-                <div class="dnd-session-card">
-                    <div class="dnd-session-teacher">Giáo viên: ${session.teacher_name}</div>
-                    <div class="dnd-session-status ${statusClass}">Trạng thái: ${statusText}</div>
-                    <div class="dnd-session-time">Thời gian: ${scheduledTime}</div>
-                    <button class="dnd-btn dnd-btn-cancel" data-session-id="${session.id}">
-                        Hủy buổi học
-                    </button>
-                </div>
-            `;
-        }).join('');
+    // Handle pagination
+    $sessionsBlock.on('click', '.dnd-page-link', function(e) {
+        e.preventDefault();
+        const page = $(this).data('page');
+        if (page && page !== currentPage) {
+            currentPage = parseInt(page);
+            loadSessions();
+        }
+    });
 
-        $sessionsList.html(html);
+    // Handle cancel buttons
+    $sessionsBlock.on('click', '.dnd-btn-cancel', function() {
+        const sessionId = $(this).data('session-id');
+        if (confirm('Bạn có chắc muốn hủy buổi học này?')) {
+            cancelSession(sessionId);
+        }
+    });
 
-        // Add event listeners for cancel buttons
-        $('.dnd-btn-cancel').on('click', function() {
-            const sessionId = $(this).data('session-id');
-            if (confirm('Bạn có chắc muốn hủy buổi học này?')) {
-                cancelSession(sessionId, $(this).closest('.dnd-session-card'));
+    // Handle join buttons
+    $sessionsBlock.on('click', '.dnd-btn-join', function() {
+        const sessionId = $(this).data('session-id');
+        // Implement join logic, e.g., open meeting link
+        alert('Tham gia buổi học: ' + sessionId);
+    });
+
+    // Handle rate buttons
+    $sessionsBlock.on('click', '.dnd-btn-rate', function() {
+        const sessionId = $(this).data('session-id');
+        // Implement rating modal or redirect
+        alert('Đánh giá buổi học: ' + sessionId);
+    });
+
+    // Handle feedback buttons
+    $sessionsBlock.on('click', '.dnd-btn-feedback', function() {
+        const sessionId = $(this).data('session-id');
+        // Implement view feedback logic
+        alert('Xem phản hồi giáo viên: ' + sessionId);
+    });
+
+    function loadSessions() {
+        $sessionsList.html('<div class="dnd-loading">Loading...</div>');
+
+        $.ajax({
+            url: dnd_speaking_data.ajax_url,
+            method: 'POST',
+            data: {
+                action: 'get_student_sessions',
+                filter: currentFilter,
+                per_page: currentPerPage,
+                page: currentPage,
+                nonce: dnd_speaking_data.nonce
+            },
+            success: function(response) {
+                if (response.success) {
+                    console.log('AJAX Response:', response);
+                    console.log('Total sessions:', response.data.total_sessions, 'Total pages:', response.data.total_pages);
+                    $sessionsList.html(response.data.html);
+                    updateFilterButtons();
+                } else {
+                    $sessionsList.html('<p>Có lỗi xảy ra khi tải dữ liệu.</p>');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading sessions:', xhr.responseText, status, error);
+                $sessionsList.html('<p>Có lỗi xảy ra khi tải dữ liệu.</p>');
             }
         });
     }
 
-    function cancelSession(sessionId, $card) {
+    function updateFilterButtons() {
+        $('.dnd-filter-btn').removeClass('active');
+        $('.dnd-filter-btn[data-filter="' + currentFilter + '"]').addClass('active');
+    }
+
+    function cancelSession(sessionId) {
         $.ajax({
             url: dnd_speaking_data.rest_url + 'cancel-session',
             method: 'POST',
@@ -80,12 +123,7 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    $card.fadeOut(300, function() {
-                        $(this).remove();
-                        if ($('.dnd-session-card').length === 0) {
-                            $sessionsList.html('<p>Bạn chưa có buổi học nào sắp tới.</p>');
-                        }
-                    });
+                    loadSessions(); // Reload after cancel
                 } else {
                     alert('Không thể hủy buổi học. Vui lòng thử lại.');
                 }
