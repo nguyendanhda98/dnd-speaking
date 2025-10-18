@@ -8,10 +8,12 @@ class DND_Speaking_Admin {
     public function __construct() {
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
+        add_action('admin_notices', [$this, 'display_admin_notices']);
         add_action('wp_ajax_update_teacher_availability', [$this, 'update_teacher_availability']);
         add_action('wp_ajax_handle_teacher_request', [$this, 'handle_teacher_request']);
         add_action('wp_ajax_handle_upcoming_session', [$this, 'handle_upcoming_session']);
         add_action('wp_ajax_save_teacher_schedule', [$this, 'save_teacher_schedule']);
+        add_filter('pre_update_option_dnd_discord_bot_token', [$this, 'validate_discord_bot_token'], 10, 2);
     }
 
     public function add_admin_menu() {
@@ -265,14 +267,72 @@ class DND_Speaking_Admin {
     }
 
     public function settings_page() {
+        $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'main';
+        $active_sub_tab = isset($_GET['sub_tab']) ? $_GET['sub_tab'] : 'app_details';
         ?>
         <div class="wrap">
             <h1>Settings</h1>
+            <h2 class="nav-tab-wrapper">
+                <a href="?page=dnd-speaking-settings&tab=main" class="nav-tab <?php echo $active_tab == 'main' ? 'nav-tab-active' : ''; ?>">Main</a>
+                <a href="?page=dnd-speaking-settings&tab=discord" class="nav-tab <?php echo $active_tab == 'discord' ? 'nav-tab-active' : ''; ?>">Discord</a>
+            </h2>
+            <?php if ($active_tab == 'discord'): ?>
+            <h2 class="nav-tab-wrapper">
+                <a href="?page=dnd-speaking-settings&tab=discord&sub_tab=app_details" class="nav-tab <?php echo $active_sub_tab == 'app_details' ? 'nav-tab-active' : ''; ?>">Application Details</a>
+                <a href="?page=dnd-speaking-settings&tab=discord&sub_tab=advanced" class="nav-tab <?php echo $active_sub_tab == 'advanced' ? 'nav-tab-active' : ''; ?>">Advanced</a>
+            </h2>
+            <?php endif; ?>
             <form method="post" action="options.php">
                 <?php
-                settings_fields('dnd_speaking_settings');
-                do_settings_sections('dnd_speaking_settings');
-                submit_button();
+                if ($active_tab == 'main') {
+                    settings_fields('dnd_speaking_settings');
+                    do_settings_sections('dnd_speaking_settings');
+                    submit_button();
+                } elseif ($active_tab == 'discord') {
+                    settings_fields('dnd_speaking_discord_settings');
+                    if ($active_sub_tab == 'app_details') {
+                        ?>
+                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <label for="dnd_discord_client_id" style="width: 150px; font-weight: bold;">Client ID</label>
+                            <input type="text" id="dnd_discord_client_id" name="dnd_discord_client_id" value="<?php echo esc_attr(get_option('dnd_discord_client_id')); ?>" style="max-width: 300px;" />
+                        </div>
+                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <label for="dnd_discord_client_secret" style="width: 150px; font-weight: bold;">Client Secret</label>
+                            <input type="password" id="dnd_discord_client_secret" name="dnd_discord_client_secret" value="<?php echo esc_attr(get_option('dnd_discord_client_secret')); ?>" style="max-width: 300px;" />
+                        </div>
+                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <label for="dnd_discord_redirect_url" style="width: 150px; font-weight: bold;">Redirect URL</label>
+                            <input type="url" id="dnd_discord_redirect_url" name="dnd_discord_redirect_url" value="<?php echo esc_attr(get_option('dnd_discord_redirect_url')); ?>" style="max-width: 300px;" />
+                        </div>
+                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <label for="dnd_discord_admin_redirect_url" style="width: 150px; font-weight: bold;">Admin Redirect URL</label>
+                            <input type="url" id="dnd_discord_admin_redirect_url" name="dnd_discord_admin_redirect_url" value="<?php echo esc_attr(get_option('dnd_discord_admin_redirect_url')); ?>" style="max-width: 300px;" />
+                        </div>
+                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <label for="dnd_discord_bot_token" style="width: 150px; font-weight: bold;">Bot Token</label>
+                            <input type="password" id="dnd_discord_bot_token" name="dnd_discord_bot_token" value="<?php echo esc_attr(get_option('dnd_discord_bot_token')); ?>" style="max-width: 300px;" />
+                        </div>
+                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <label for="dnd_discord_server_id" style="width: 150px; font-weight: bold;">Server ID</label>
+                            <input type="text" id="dnd_discord_server_id" name="dnd_discord_server_id" value="<?php echo esc_attr(get_option('dnd_discord_server_id')); ?>" style="max-width: 300px;" />
+                        </div>
+                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <label for="dnd_discord_connect_to_bot" style="width: 150px; font-weight: bold;">Connect to Bot</label>
+                            <input type="checkbox" id="dnd_discord_connect_to_bot" name="dnd_discord_connect_to_bot" value="1" <?php checked(1, get_option('dnd_discord_connect_to_bot'), true); ?> />
+                        </div>
+                        <?php
+                        $this->display_bot_status();
+                        ?>
+                        <?php
+                    } elseif ($active_sub_tab == 'advanced') {
+                        echo '<p>Advanced settings will be added here.</p>';
+                    }
+                    ?>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <?php submit_button(); ?>
+                    </div>
+                    <?php
+                }
                 ?>
             </form>
         </div>
@@ -314,6 +374,85 @@ class DND_Speaking_Admin {
             'dnd_speaking_settings',
             'dnd_speaking_main'
         );
+
+        // Discord settings
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_client_id');
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_client_secret');
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_redirect_url');
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_admin_redirect_url');
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_bot_token');
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_server_id');
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_connect_to_bot');
+
+        add_settings_section(
+            'dnd_speaking_discord_app_details',
+            'Application Details',
+            null,
+            'dnd_speaking_discord_settings'
+        );
+
+        add_settings_section(
+            'dnd_speaking_discord_advanced',
+            'Advanced',
+            null,
+            'dnd_speaking_discord_settings'
+        );
+
+        add_settings_field(
+            'discord_client_id',
+            'Client ID',
+            [$this, 'discord_client_id_field'],
+            'dnd_speaking_discord_settings',
+            'dnd_speaking_discord_app_details'
+        );
+
+        add_settings_field(
+            'discord_client_secret',
+            'Client Secret',
+            [$this, 'discord_client_secret_field'],
+            'dnd_speaking_discord_settings',
+            'dnd_speaking_discord_app_details'
+        );
+
+        add_settings_field(
+            'discord_redirect_url',
+            'Redirect URL',
+            [$this, 'discord_redirect_url_field'],
+            'dnd_speaking_discord_settings',
+            'dnd_speaking_discord_app_details'
+        );
+
+        add_settings_field(
+            'discord_admin_redirect_url',
+            'Admin Redirect URL',
+            [$this, 'discord_admin_redirect_url_field'],
+            'dnd_speaking_discord_settings',
+            'dnd_speaking_discord_app_details'
+        );
+
+        add_settings_field(
+            'discord_connect_to_bot',
+            'Connect to Bot',
+            [$this, 'discord_connect_to_bot_field'],
+            'dnd_speaking_discord_settings',
+            'dnd_speaking_discord_app_details'
+        );
+
+        add_settings_field(
+            'discord_bot_token',
+            'Bot Token',
+            [$this, 'discord_bot_token_field'],
+            'dnd_speaking_discord_settings',
+            'dnd_speaking_discord_app_details'
+        );
+
+        add_settings_field(
+            'discord_server_id',
+            'Server ID',
+            [$this, 'discord_server_id_field'],
+            'dnd_speaking_discord_settings',
+            'dnd_speaking_discord_app_details'
+        );
     }
 
     public function session_duration_field() {
@@ -337,6 +476,79 @@ class DND_Speaking_Admin {
         }
         echo '</select>';
         echo '<p class="description">Select which WordPress role should be considered as teachers.</p>';
+    }
+
+    public function discord_client_id_field() {
+        $value = get_option('dnd_discord_client_id', '');
+        echo '<input type="text" name="dnd_discord_client_id" value="' . esc_attr($value) . '" class="regular-text" />';
+    }
+
+    public function discord_client_secret_field() {
+        $value = get_option('dnd_discord_client_secret', '');
+        echo '<input type="password" name="dnd_discord_client_secret" value="' . esc_attr($value) . '" class="regular-text" />';
+    }
+
+    public function discord_redirect_url_field() {
+        $value = get_option('dnd_discord_redirect_url', '');
+        echo '<input type="url" name="dnd_discord_redirect_url" value="' . esc_attr($value) . '" class="regular-text" />';
+    }
+
+    public function discord_admin_redirect_url_field() {
+        $value = get_option('dnd_discord_admin_redirect_url', '');
+        echo '<input type="url" name="dnd_discord_admin_redirect_url" value="' . esc_attr($value) . '" class="regular-text" />';
+    }
+
+    public function discord_connect_to_bot_field() {
+        $value = get_option('dnd_discord_connect_to_bot', '');
+        echo '<input type="checkbox" name="dnd_discord_connect_to_bot" value="1" ' . checked(1, $value, false) . ' /> Enable connection to bot';
+    }
+
+    public function discord_bot_token_field() {
+        $value = get_option('dnd_discord_bot_token', '');
+        echo '<input type="password" name="dnd_discord_bot_token" value="' . esc_attr($value) . '" class="regular-text" />';
+    }
+
+    public function discord_server_id_field() {
+        $value = get_option('dnd_discord_server_id', '');
+        echo '<input type="text" name="dnd_discord_server_id" value="' . esc_attr($value) . '" class="regular-text" />';
+    }
+
+    public function display_bot_status() {
+        $bot_token = get_option('dnd_discord_bot_token', '');
+        $server_id = get_option('dnd_discord_server_id', '');
+        $connect_to_bot = get_option('dnd_discord_connect_to_bot', '');
+
+        $status = 'disconnected';
+        $status_text = 'Bot Disconnected';
+        $color = 'red';
+
+        if (!empty($bot_token) && !empty($server_id) && $connect_to_bot) {
+            // Here you would add logic to verify the bot token and server connection
+            // For now, assume connected if all fields are filled
+            $status = 'connected';
+            $status_text = 'Bot Connected';
+            $color = 'green';
+        }
+
+        echo '<strong style="color: ' . $color . ';">' . $status_text . '</strong>';
+    }
+
+    public function validate_discord_bot_token($new_value, $old_value) {
+        if (empty($new_value)) {
+            return $new_value; // Allow empty
+        }
+        // Simple validation: check if it's a string
+        if (!is_string($new_value)) {
+            add_settings_error('dnd_discord_bot_token', 'invalid_token', 'Bot Token must be a valid string.');
+            return $old_value;
+        }
+        // Here you could add API call to validate token
+        // For now, assume valid
+        return $new_value;
+    }
+
+    public function display_admin_notices() {
+        settings_errors('dnd_speaking_discord_settings');
     }
 
     public function handle_add_credits() {
