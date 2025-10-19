@@ -1425,12 +1425,25 @@ class DND_Speaking_REST_API {
 
         $state = wp_create_nonce('discord_auth_' . get_current_user_id());
         update_user_meta(get_current_user_id(), 'discord_auth_state', $state);
+    // Also map state -> user for callback when cookies/session aren't present
+    set_transient('dnd_discord_state_' . $state, get_current_user_id(), 10 * MINUTE_IN_SECONDS);
+
+        // Request broader scopes as required by product needs
+        $scopes = [
+            'identify',
+            'email',
+            'guilds',
+            'guilds.join',
+            'guilds.members.read',
+            'gdm.join'
+        ];
 
         $auth_url = 'https://discord.com/api/oauth2/authorize?' . http_build_query([
             'client_id' => $client_id,
             'redirect_uri' => $redirect_uri,
             'response_type' => 'code',
-            'scope' => 'identify',
+            // Discord expects space-delimited scopes
+            'scope' => implode(' ', $scopes),
             'state' => $state
         ]);
 
@@ -1440,7 +1453,14 @@ class DND_Speaking_REST_API {
     public function handle_discord_callback($request) {
         $code = $request->get_param('code');
         $state = $request->get_param('state');
-        $user_id = get_current_user_id();
+        // Try to resolve the initiating user by state mapping first (handles no-cookie redirects)
+        $mapped_user_id = (int) get_transient('dnd_discord_state_' . $state);
+        $user_id = $mapped_user_id ?: get_current_user_id();
+
+        // Basic debug logging
+        if (function_exists('error_log')) {
+            error_log('[DND Discord] Callback invoked. code present=' . (!empty($code) ? 'yes' : 'no') . ', state=' . sanitize_text_field((string)$state) . ', mapped_user_id=' . $mapped_user_id . ', current_user_id=' . get_current_user_id());
+        }
 
         if (!$code || !$state) {
             wp_redirect(home_url());
@@ -1448,8 +1468,11 @@ class DND_Speaking_REST_API {
         }
 
         // Verify state
-        $stored_state = get_user_meta($user_id, 'discord_auth_state', true);
+        $stored_state = $user_id ? get_user_meta($user_id, 'discord_auth_state', true) : '';
         if ($state !== $stored_state) {
+            if (function_exists('error_log')) {
+                error_log('[DND Discord] State mismatch or user not resolved. user_id=' . $user_id . ', stored_state=' . (string)$stored_state);
+            }
             wp_redirect(home_url());
             exit;
         }
@@ -1460,6 +1483,9 @@ class DND_Speaking_REST_API {
         $redirect_uri = get_site_url() . '/wp-json/dnd-speaking/v1/discord/callback';
 
         $response = wp_remote_post('https://discord.com/api/oauth2/token', [
+            'headers' => [
+                'Content-Type' => 'application/x-www-form-urlencoded'
+            ],
             'body' => [
                 'client_id' => $client_id,
                 'client_secret' => $client_secret,
@@ -1470,13 +1496,30 @@ class DND_Speaking_REST_API {
         ]);
 
         if (is_wp_error($response)) {
+            if (function_exists('error_log')) {
+                error_log('[DND Discord] Token exchange failed: ' . $response->get_error_message());
+            }
             wp_redirect(home_url());
             exit;
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
+        if (function_exists('error_log')) {
+            error_log('[DND Discord] Token response keys: ' . implode(',', array_keys((array)$body)));
+        }
         if (isset($body['access_token'])) {
             update_user_meta($user_id, 'discord_access_token', $body['access_token']);
+            // Persist refresh token/expires/scopes when available
+            if (!empty($body['refresh_token'])) {
+                update_user_meta($user_id, 'discord_refresh_token', $body['refresh_token']);
+            }
+            if (!empty($body['expires_in'])) {
+                // Store absolute expiry timestamp for convenience
+                update_user_meta($user_id, 'discord_token_expires_at', time() + intval($body['expires_in']));
+            }
+            if (!empty($body['scope'])) {
+                update_user_meta($user_id, 'discord_scopes', $body['scope']);
+            }
             update_user_meta($user_id, 'discord_connected', true);
 
             // Get user info
@@ -1486,11 +1529,28 @@ class DND_Speaking_REST_API {
                 ]
             ]);
 
-            if (!is_wp_error($user_response)) {
+            if (is_wp_error($user_response)) {
+                if (function_exists('error_log')) {
+                    error_log('[DND Discord] Failed to fetch user info: ' . $user_response->get_error_message());
+                }
+            } else {
                 $user_data = json_decode(wp_remote_retrieve_body($user_response), true);
-                update_user_meta($user_id, 'discord_user_id', $user_data['id']);
-                update_user_meta($user_id, 'discord_username', $user_data['username']);
+                if (!empty($user_data['id'])) {
+                    update_user_meta($user_id, 'discord_user_id', $user_data['id']);
+                }
+                if (!empty($user_data['username'])) {
+                    update_user_meta($user_id, 'discord_username', $user_data['username']);
+                }
+                // Email returned when 'email' scope is granted
+                if (!empty($user_data['email'])) {
+                    update_user_meta($user_id, 'discord_email', $user_data['email']);
+                }
+                if (function_exists('error_log')) {
+                    error_log('[DND Discord] Saved user meta for user_id=' . $user_id);
+                }
             }
+            // Invalidate one-time state mapping
+            delete_transient('dnd_discord_state_' . $state);
         }
 
         wp_redirect(home_url());
@@ -1504,6 +1564,10 @@ class DND_Speaking_REST_API {
         delete_user_meta($user_id, 'discord_connected');
         delete_user_meta($user_id, 'discord_user_id');
         delete_user_meta($user_id, 'discord_username');
+        delete_user_meta($user_id, 'discord_email');
+        delete_user_meta($user_id, 'discord_scopes');
+        delete_user_meta($user_id, 'discord_refresh_token');
+        delete_user_meta($user_id, 'discord_token_expires_at');
 
         return ['success' => true];
     }

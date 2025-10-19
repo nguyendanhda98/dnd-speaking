@@ -308,7 +308,7 @@ class DND_Speaking_Admin {
                                 <span class="dashicons dashicons-yes dnd-copy-feedback" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #46b450; display: none;"></span>
                             </div>
                         </div>
-                        <p class="description" style="margin-left: 160px; margin-top: -10px;">Click the URL above to copy it to clipboard, then paste into your Discord app's OAuth2 Redirect URIs.</p>
+                        <p class="description" style="margin-left: 160px; margin-top: -10px;">Copy this URL and paste inside your https://discord.com/developers/applications -> 0Auth2 -> Redirects</p>
                         <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
                             <label for="dnd_discord_admin_redirect_url" style="width: 150px; font-weight: bold;">Admin Redirect URL</label>
                             <input type="url" id="dnd_discord_admin_redirect_url" name="dnd_discord_admin_redirect_url" value="<?php echo esc_attr(get_option('dnd_discord_admin_redirect_url')); ?>" style="max-width: 300px;" />
