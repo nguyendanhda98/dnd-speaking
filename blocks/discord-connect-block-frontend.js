@@ -24,26 +24,12 @@ jQuery(document).ready(function($) {
     function connectDiscord() {
         $status.html('<p>Đang kết nối với Discord...</p>');
 
-        // Get Discord auth URL
-        $.ajax({
-            url: dnd_discord_data.rest_url + 'discord/auth-url',
-            method: 'GET',
-            headers: {
-                'X-WP-Nonce': dnd_discord_data.nonce
-            },
-            success: function(response) {
-                if (response.url) {
-                    // Redirect to Discord auth
-                    window.location.href = response.url;
-                } else {
-                    $status.html('<p>Lỗi: Không thể lấy URL xác thực Discord.</p>');
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('Error getting Discord auth URL:', xhr.responseText);
-                $status.html('<p>Lỗi khi kết nối Discord. Vui lòng thử lại.</p>');
-            }
-        });
+        if (dnd_discord_data.discord_auth_url) {
+            // Redirect to Discord auth
+            window.location.href = dnd_discord_data.discord_auth_url;
+        } else {
+            $status.html('<p>Lỗi: URL xác thực Discord chưa được cấu hình.</p>');
+        }
     }
 
     function disconnectDiscord() {
