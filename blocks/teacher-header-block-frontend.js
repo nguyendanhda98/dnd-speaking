@@ -1,5 +1,5 @@
 jQuery(document).ready(function($) {
-    const $toggle = $('#dnd-teacher-available');
+    const $toggle = $('#teacher-status-toggle');
 
     if ($toggle.length === 0) return;
 

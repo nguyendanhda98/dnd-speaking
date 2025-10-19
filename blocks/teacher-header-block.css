@@ -1,40 +1,59 @@
-.dnd-teacher-header {
+.dnd-teacher-status {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     padding: 30px;
     border-radius: 12px;
     margin: 20px 0;
     box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-}
-
-.dnd-teacher-header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    max-width: 1200px;
-    margin: 0 auto;
+    gap: 40px;
 }
 
-.dnd-availability-toggle {
+.status-section, .room-section {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
-.dnd-toggle-label {
+.status-label, .room-label {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.status-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-text {
+    font-size: 14px;
+}
+
+.status-text.offline {
+    color: #ccc;
+}
+
+.status-text.online {
+    color: #28a745;
+}
+
+.status-toggle-label {
     position: relative;
     display: inline-block;
     width: 60px;
     height: 30px;
 }
 
-.dnd-toggle-label input {
+.status-toggle-label input {
     opacity: 0;
     width: 0;
     height: 0;
 }
 
-.dnd-toggle-slider {
+.status-toggle-slider {
     position: absolute;
     cursor: pointer;
     top: 0;
@@ -46,7 +65,7 @@
     border-radius: 30px;
 }
 
-.dnd-toggle-slider:before {
+.status-toggle-slider:before {
     position: absolute;
     content: "";
     height: 22px;
@@ -58,49 +77,25 @@
     border-radius: 50%;
 }
 
-input:checked + .dnd-toggle-slider {
+input:checked + .status-toggle-slider {
     background-color: #28a745;
 }
 
-input:checked + .dnd-toggle-slider:before {
+input:checked + .status-toggle-slider:before {
     transform: translateX(30px);
 }
 
-.dnd-toggle-text {
-    font-weight: 600;
+.room-link {
+    color: #fff;
+    text-decoration: underline;
     font-size: 16px;
-}
-
-.dnd-teacher-stats {
-    display: flex;
-    gap: 40px;
-}
-
-.dnd-stat-item {
-    text-align: center;
-}
-
-.dnd-stat-number {
-    display: block;
-    font-size: 32px;
-    font-weight: bold;
-    margin-bottom: 4px;
-}
-
-.dnd-stat-label {
-    font-size: 14px;
-    opacity: 0.9;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-    .dnd-teacher-header-content {
+    .dnd-teacher-status {
         flex-direction: column;
         gap: 20px;
         text-align: center;
-    }
-
-    .dnd-teacher-stats {
-        gap: 30px;
     }
 }
