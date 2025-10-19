@@ -59,6 +59,7 @@ class DND_Speaking_Teacher_Status_Block {
                 'rest_url' => rest_url('dnd-speaking/v1/'),
                 'nonce' => wp_create_nonce('update_teacher_availability_nonce'),
                 'rest_nonce' => wp_create_nonce('wp_rest'),
+                'discord_auth_url' => get_option('dnd_discord_generated_url'),
             ]);
         }
     }

@@ -39,25 +39,11 @@ jQuery(document).ready(function($) {
                         // Bind click event for connect link
                         $('#connect-discord-link').off('click').on('click', function(e) {
                             e.preventDefault();
-                            
-                            // Get auth URL from API
-                            $.ajax({
-                                url: dnd_teacher_data.rest_url + 'discord/auth-url',
-                                method: 'GET',
-                                headers: {
-                                    'X-WP-Nonce': dnd_teacher_data.rest_nonce
-                                },
-                                success: function(response) {
-                                    if (response.url) {
-                                        window.location.href = response.url;
-                                    } else {
-                                        alert('Failed to get Discord auth URL');
-                                    }
-                                },
-                                error: function() {
-                                    alert('Error getting Discord auth URL. Please check console.');
-                                }
-                            });
+                            if (dnd_teacher_data.discord_auth_url) {
+                                window.location.href = dnd_teacher_data.discord_auth_url;
+                            } else {
+                                alert('Discord auth URL not configured. Please contact administrator.');
+                            }
                         });
                         
                         // Revert toggle
