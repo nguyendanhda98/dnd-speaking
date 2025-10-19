@@ -89,6 +89,12 @@ class DND_Speaking_REST_API {
             'permission_callback' => [$this, 'check_user_logged_in'],
         ]);
 
+        register_rest_route('dnd-speaking/v1', '/discord/user-info', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_discord_user_info'],
+            'permission_callback' => [$this, 'check_user_logged_in'],
+        ]);
+
         register_rest_route('dnd-speaking/v1', '/discord/create-voice-channel', [
             'methods' => 'POST',
             'callback' => [$this, 'create_discord_voice_channel'],
@@ -1589,13 +1595,14 @@ class DND_Speaking_REST_API {
         $user_id = get_current_user_id();
 
         delete_user_meta($user_id, 'discord_access_token');
-        delete_user_meta($user_id, 'discord_connected');
-        delete_user_meta($user_id, 'discord_user_id');
-        delete_user_meta($user_id, 'discord_username');
-        delete_user_meta($user_id, 'discord_email');
-        delete_user_meta($user_id, 'discord_scopes');
         delete_user_meta($user_id, 'discord_refresh_token');
         delete_user_meta($user_id, 'discord_token_expires_at');
+        delete_user_meta($user_id, 'discord_scopes');
+        delete_user_meta($user_id, 'discord_user_id');
+        delete_user_meta($user_id, 'discord_username');
+        delete_user_meta($user_id, 'discord_global_name');
+        delete_user_meta($user_id, 'discord_email');
+        delete_user_meta($user_id, 'discord_connected');
 
         return ['success' => true];
     }
@@ -1680,9 +1687,15 @@ class DND_Speaking_REST_API {
         $body = json_decode(wp_remote_retrieve_body($response), true);
         if (function_exists('error_log')) {
             error_log('[DND Discord Page Callback] Token response keys: ' . implode(',', array_keys((array)$body)));
+            error_log('[DND Discord Page Callback] Full token response: ' . print_r($body, true));
         }
         
         if (isset($body['access_token'])) {
+            if (function_exists('error_log')) {
+                error_log('[DND Discord Page Callback] Access token received. Scopes granted: ' . ($body['scope'] ?? 'none'));
+                error_log('[DND Discord Page Callback] Token expires in: ' . ($body['expires_in'] ?? 'unknown') . ' seconds');
+                error_log('[DND Discord Page Callback] Refresh token: ' . (!empty($body['refresh_token']) ? 'present' : 'not provided'));
+            }
             update_user_meta($user_id, 'discord_access_token', $body['access_token']);
             // Persist refresh token/expires/scopes when available
             if (!empty($body['refresh_token'])) {
@@ -1694,6 +1707,9 @@ class DND_Speaking_REST_API {
             }
             if (!empty($body['scope'])) {
                 update_user_meta($user_id, 'discord_scopes', $body['scope']);
+                if (function_exists('error_log')) {
+                    error_log('[DND Discord Page Callback] Saved scopes to user meta: ' . $body['scope']);
+                }
             }
             update_user_meta($user_id, 'discord_connected', true);
 
@@ -1710,23 +1726,32 @@ class DND_Speaking_REST_API {
                 }
             } else {
                 $user_data = json_decode(wp_remote_retrieve_body($user_response), true);
+                if (function_exists('error_log')) {
+                    error_log('[DND Discord Page Callback] User info response: ' . print_r($user_data, true));
+                }
                 if (!empty($user_data['id'])) {
                     update_user_meta($user_id, 'discord_user_id', $user_data['id']);
                 }
                 if (!empty($user_data['username'])) {
                     update_user_meta($user_id, 'discord_username', $user_data['username']);
                 }
+                if (!empty($user_data['global_name'])) {
+                    update_user_meta($user_id, 'discord_global_name', $user_data['global_name']);
+                }
                 // Email returned when 'email' scope is granted
                 if (!empty($user_data['email'])) {
                     update_user_meta($user_id, 'discord_email', $user_data['email']);
                 }
                 if (function_exists('error_log')) {
-                    error_log('[DND Discord Page Callback] Saved user meta for user_id=' . $user_id);
+                    error_log('[DND Discord Page Callback] Saved user meta for user_id=' . $user_id . ': discord_user_id=' . ($user_data['id'] ?? 'none') . ', username=' . ($user_data['username'] ?? 'none') . ', global_name=' . ($user_data['global_name'] ?? 'none') . ', email=' . ($user_data['email'] ?? 'none'));
                 }
             }
             // Invalidate one-time state mapping
             if ($state) {
                 delete_transient('dnd_discord_state_' . $state);
+            }
+            if (function_exists('error_log')) {
+                error_log('[DND Discord Page Callback] Discord OAuth flow completed successfully for user_id=' . $user_id);
             }
         }
 
@@ -1832,5 +1857,23 @@ class DND_Speaking_REST_API {
         }
 
         return new WP_Error('discord_channel_creation_failed', 'Failed to create voice channel', ['status' => 500]);
+    }
+
+    public function get_discord_user_info($request) {
+        $user_id = get_current_user_id();
+        
+        $discord_info = [
+            'connected' => get_user_meta($user_id, 'discord_connected', true) == '1',
+            'access_token' => get_user_meta($user_id, 'discord_access_token', true),
+            'expires_at' => get_user_meta($user_id, 'discord_token_expires_at', true),
+            'refresh_token' => get_user_meta($user_id, 'discord_refresh_token', true),
+            'scope' => get_user_meta($user_id, 'discord_scopes', true),
+            'id' => get_user_meta($user_id, 'discord_user_id', true),
+            'username' => get_user_meta($user_id, 'discord_username', true),
+            'global_name' => get_user_meta($user_id, 'discord_global_name', true),
+            'email' => get_user_meta($user_id, 'discord_email', true),
+        ];
+
+        return $discord_info;
     }
 }
