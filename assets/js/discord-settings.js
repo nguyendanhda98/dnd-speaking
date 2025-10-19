@@ -89,6 +89,21 @@ jQuery(document).ready(function($) {
                 console.error('AJAX Error: ' + textStatus + ': ' + errorThrown);
             }
         });
+        
+        // Update Redirect URL when a page is selected
+        $pageDropdown.on('change', function() {
+            var selectedUrl = $(this).val();
+            if (selectedUrl) {
+                // Add the query parameter to the URL
+                var separator = selectedUrl.indexOf('?') !== -1 ? '&' : '?';
+                var newRedirectUrl = selectedUrl + separator + 'via=connect-dnd-speaking-discord';
+                
+                // Update the redirect URL input
+                $('#dnd_discord_redirect_url_display').val(newRedirectUrl);
+                
+                console.log('Updated redirect URL to:', newRedirectUrl);
+            }
+        });
     }
 
 

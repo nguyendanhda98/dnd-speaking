@@ -312,7 +312,7 @@ class DND_Speaking_Admin {
                         <p class="description" style="margin-left: 160px; margin-top: -10px;">Copy this URL and paste inside your https://discord.com/developers/applications -> 0Auth2 -> Redirects</p>
                         <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
                             <label for="dnd_discord_redirect_page" style="width: 150px; font-weight: bold;">Redirect Page</label>
-                            <select id="dnd_discord_redirect_page" name="dnd_discord_redirect_page" style="max-width: 300px;" data-selected="<?php echo esc_attr(get_option('dnd_discord_redirect_page')); ?>">
+                            <select id="dnd_discord_redirect_page" name="dnd_discord_redirect_page" style="max-width: 300px; width: 300px;" data-selected="<?php echo esc_attr(get_option('dnd_discord_redirect_page')); ?>">
                                 <option value="">-- Select a page --</option>
                             </select>
                         </div>
