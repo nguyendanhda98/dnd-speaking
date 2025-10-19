@@ -14,6 +14,7 @@ class DND_Speaking_Admin {
         add_action('wp_ajax_handle_teacher_request', [$this, 'handle_teacher_request']);
         add_action('wp_ajax_handle_upcoming_session', [$this, 'handle_upcoming_session']);
         add_action('wp_ajax_save_teacher_schedule', [$this, 'save_teacher_schedule']);
+        add_action('wp_ajax_get_pages', [$this, 'get_pages']);
         add_filter('pre_update_option_dnd_discord_bot_token', [$this, 'validate_discord_bot_token'], 10, 2);
     }
 
@@ -310,6 +311,13 @@ class DND_Speaking_Admin {
                         </div>
                         <p class="description" style="margin-left: 160px; margin-top: -10px;">Copy this URL and paste inside your https://discord.com/developers/applications -> 0Auth2 -> Redirects</p>
                         <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <label for="dnd_discord_redirect_page" style="width: 150px; font-weight: bold;">Redirect Page</label>
+                            <select id="dnd_discord_redirect_page" name="dnd_discord_redirect_page" style="max-width: 300px;" data-selected="<?php echo esc_attr(get_option('dnd_discord_redirect_page')); ?>">
+                                <option value="">-- Select a page --</option>
+                            </select>
+                        </div>
+                        <p class="description" style="margin-left: 160px; margin-top: -10px;">Select the page where users will be redirected after Discord authentication</p>
+                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
                             <label for="dnd_discord_admin_redirect_url" style="width: 150px; font-weight: bold;">Admin Redirect URL</label>
                             <input type="url" id="dnd_discord_admin_redirect_url" name="dnd_discord_admin_redirect_url" value="<?php echo esc_attr(get_option('dnd_discord_admin_redirect_url')); ?>" style="max-width: 300px;" />
                         </div>
@@ -418,6 +426,7 @@ class DND_Speaking_Admin {
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_client_id');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_client_secret');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_redirect_url');
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_redirect_page');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_admin_redirect_url');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_bot_token');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_server_id');
@@ -495,8 +504,28 @@ class DND_Speaking_Admin {
     }
 
     public function enqueue_admin_scripts($hook) {
-        // Load on all admin pages for now to debug
-        wp_enqueue_script('dnd-discord-settings', plugin_dir_url(__FILE__) . '../assets/js/discord-settings.js', ['jquery'], '1.0.0', true);
+        // Only load on DND Speaking settings pages
+        if (strpos($hook, 'dnd-speaking') === false) {
+            return;
+        }
+        
+        wp_enqueue_script('discord-settings', plugins_url('../assets/js/discord-settings.js', __FILE__), array('jquery'), null, true);
+        wp_localize_script('discord-settings', 'dndSettings', array(
+            'ajaxurl' => admin_url('admin-ajax.php')
+        ));
+    }
+
+    // AJAX handler to get pages
+    public function get_pages() {
+        $pages = get_pages();
+        $page_list = [];
+        foreach ($pages as $page) {
+            $page_list[] = [
+                'title' => $page->post_title,
+                'url' => get_permalink($page->ID)
+            ];
+        }
+        wp_send_json($page_list);
     }
 
     public function session_duration_field() {

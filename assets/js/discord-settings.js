@@ -55,4 +55,43 @@ jQuery(document).ready(function($) {
             $feedback.hide();
         }, 2000);
     }
+
+    // Populate the redirect page dropdown
+    var $pageDropdown = $('#dnd_discord_redirect_page');
+    
+    if ($pageDropdown.length > 0) {
+        console.log('Redirect page dropdown found, fetching pages...');
+        
+        // Fetch pages from the server
+        $.ajax({
+            url: dndSettings.ajaxurl,
+            method: 'POST',
+            data: {
+                action: 'get_pages'
+            },
+            success: function(pages) {
+                console.log('Pages loaded:', pages);
+                var savedPage = $pageDropdown.data('selected') || '';
+                
+                pages.forEach(function(page) {
+                    var $option = $('<option></option>')
+                        .val(page.url)
+                        .text(page.title);
+                    
+                    if (page.url === savedPage) {
+                        $option.prop('selected', true);
+                    }
+                    
+                    $pageDropdown.append($option);
+                });
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.error('AJAX Error: ' + textStatus + ': ' + errorThrown);
+            }
+        });
+    }
+
+
+    // Append the dropdown to the settings container
+    $('.settings-container').append($pageDropdown);
 });
