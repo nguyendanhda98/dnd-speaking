@@ -101,9 +101,29 @@ jQuery(document).ready(function($) {
                 // Update the redirect URL input
                 $('#dnd_discord_redirect_url_display').val(newRedirectUrl);
                 
+                // Also update a hidden input to store the full URL
+                var $hiddenInput = $('#dnd_discord_redirect_page_full');
+                if ($hiddenInput.length === 0) {
+                    $hiddenInput = $('<input type="hidden" id="dnd_discord_redirect_page_full" name="dnd_discord_redirect_page_full" />');
+                    $pageDropdown.after($hiddenInput);
+                }
+                $hiddenInput.val(newRedirectUrl);
+                
                 console.log('Updated redirect URL to:', newRedirectUrl);
             }
         });
+        
+        // Initialize with saved value
+        if (typeof dndSettings !== 'undefined' && dndSettings.savedRedirectUrl) {
+            $('#dnd_discord_redirect_url_display').val(dndSettings.savedRedirectUrl);
+            var $hiddenInput = $('#dnd_discord_redirect_page_full');
+            if ($hiddenInput.length === 0) {
+                $hiddenInput = $('<input type="hidden" id="dnd_discord_redirect_page_full" name="dnd_discord_redirect_page_full" value="' + dndSettings.savedRedirectUrl + '" />');
+                $pageDropdown.after($hiddenInput);
+            } else {
+                $hiddenInput.val(dndSettings.savedRedirectUrl);
+            }
+        }
     }
 
 

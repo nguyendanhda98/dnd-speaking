@@ -12,7 +12,7 @@ class DND_Speaking_REST_API {
         add_action('wp_ajax_get_session_history', [$this, 'ajax_get_session_history']);
         add_action('wp_ajax_get_student_sessions', [$this, 'ajax_get_student_sessions']);
         add_action('wp_ajax_update_session_status', [$this, 'ajax_update_session_status']);
-        add_action('template_redirect', [$this, 'handle_discord_page_callback']);
+        add_action('wp', [$this, 'handle_discord_page_callback']);
     }
 
     public function register_routes() {
@@ -83,12 +83,6 @@ class DND_Speaking_REST_API {
             'permission_callback' => [$this, 'check_user_logged_in'],
         ]);
 
-        register_rest_route('dnd-speaking/v1', '/discord/callback', [
-            'methods' => 'GET',
-            'callback' => [$this, 'handle_discord_callback'],
-            'permission_callback' => '__return_true',
-        ]);
-
         register_rest_route('dnd-speaking/v1', '/discord/disconnect', [
             'methods' => 'POST',
             'callback' => [$this, 'disconnect_discord'],
@@ -99,6 +93,13 @@ class DND_Speaking_REST_API {
             'methods' => 'POST',
             'callback' => [$this, 'create_discord_voice_channel'],
             'permission_callback' => [$this, 'check_user_logged_in'],
+        ]);
+
+        // Test endpoint
+        register_rest_route('dnd-speaking/v1', '/test', [
+            'methods' => 'GET',
+            'callback' => [$this, 'test_endpoint'],
+            'permission_callback' => '__return_true',
         ]);
     }
 
@@ -1423,12 +1424,13 @@ class DND_Speaking_REST_API {
 
     // Discord methods
     public function get_discord_auth_url($request) {
-        $client_id = get_option('dnd_discord_client_id');
-        $redirect_uri = get_option('dnd_discord_redirect_page');
-        if ($redirect_uri && strpos($redirect_uri, 'via=connect-dnd-speaking-discord') === false) {
-            $separator = strpos($redirect_uri, '?') !== false ? '&' : '?';
-            $redirect_uri .= $separator . 'via=connect-dnd-speaking-discord';
+        if (function_exists('error_log')) {
+            error_log('[DND Discord] get_discord_auth_url called by user_id=' . get_current_user_id());
         }
+        
+        $client_id = get_option('dnd_discord_client_id');
+        $redirect_page = get_option('dnd_discord_redirect_page_full') ?: get_option('dnd_discord_redirect_page') ?: get_site_url();
+        $redirect_uri = $redirect_page ?: get_site_url();
 
         if (!$client_id) {
             return new WP_Error('discord_config_missing', 'Discord Client ID not configured', ['status' => 500]);
@@ -1461,12 +1463,23 @@ class DND_Speaking_REST_API {
         return ['url' => $auth_url];
     }
 
+    /*
     public function handle_discord_callback($request) {
         $code = $request->get_param('code');
         $state = $request->get_param('state');
+
+        // Debug logging
+        if (function_exists('error_log')) {
+            error_log('[DND Discord Callback] Started. code=' . (!empty($code) ? 'present' : 'missing') . ', state=' . (!empty($state) ? 'present' : 'missing'));
+        }
         // Try to resolve the initiating user by state mapping first (handles no-cookie redirects)
         $mapped_user_id = (int) get_transient('dnd_discord_state_' . $state);
         $user_id = $mapped_user_id ?: get_current_user_id();
+
+        // Basic debug logging
+        if (function_exists('error_log')) {
+            error_log('[DND Discord Callback] Resolved user_id=' . $user_id . ', mapped_user_id=' . $mapped_user_id . ', current_user_id=' . get_current_user_id());
+        }
 
         // Basic debug logging
         if (function_exists('error_log')) {
@@ -1564,9 +1577,13 @@ class DND_Speaking_REST_API {
             delete_transient('dnd_discord_state_' . $state);
         }
 
-        wp_redirect(home_url());
-        exit;
+        // Redirect to redirect page or home
+        $redirect_page = get_option('dnd_discord_redirect_page');
+        if (function_exists('error_log')) {
+            error_log('[DND Discord Callback] Redirecting to: ' . ($redirect_page ?: home_url()));
+        }
     }
+    */
 
     public function disconnect_discord($request) {
         $user_id = get_current_user_id();
@@ -1584,44 +1601,60 @@ class DND_Speaking_REST_API {
     }
 
     public function handle_discord_page_callback() {
-        // Check if this is a Discord callback with code and state parameters
-        if (!isset($_GET['code']) || !isset($_GET['state'])) {
+        // Debug: Log all GET parameters
+        if (function_exists('error_log')) {
+            error_log('[DND Discord Page Callback] Triggered. GET params: ' . print_r($_GET, true));
+        }
+        
+        if (!isset($_GET['via']) || $_GET['via'] !== 'connect-dnd-speaking-discord') {
             return;
         }
 
-        $code = sanitize_text_field($_GET['code']);
-        $state = sanitize_text_field($_GET['state']);
+        $code = isset($_GET['code']) ? sanitize_text_field($_GET['code']) : '';
+        $state = isset($_GET['state']) ? sanitize_text_field($_GET['state']) : '';
+
+        // Debug logging
+        if (function_exists('error_log')) {
+            error_log('[DND Discord Page Callback] Started. code=' . (!empty($code) ? 'present' : 'missing') . ', state=' . (!empty($state) ? 'present' : 'missing'));
+        }
+
+        if (!$code) {
+            if (function_exists('error_log')) {
+                error_log('[DND Discord Page Callback] No code parameter, redirecting to home');
+            }
+            wp_redirect(home_url());
+            exit;
+        }
 
         // Try to resolve the initiating user by state mapping first (handles no-cookie redirects)
-        $mapped_user_id = (int) get_transient('dnd_discord_state_' . $state);
+        $mapped_user_id = $state ? (int) get_transient('dnd_discord_state_' . $state) : 0;
         $user_id = $mapped_user_id ?: get_current_user_id();
 
         // Basic debug logging
         if (function_exists('error_log')) {
-            error_log('[DND Discord] Page Callback invoked. code present=' . (!empty($code) ? 'yes' : 'no') . ', state=' . $state . ', mapped_user_id=' . $mapped_user_id . ', current_user_id=' . get_current_user_id());
+            error_log('[DND Discord Page Callback] Resolved user_id=' . $user_id . ', mapped_user_id=' . $mapped_user_id . ', current_user_id=' . get_current_user_id());
         }
 
-        if (!$code || !$state) {
-            return;
-        }
-
-        // Verify state
-        $stored_state = $user_id ? get_user_meta($user_id, 'discord_auth_state', true) : '';
-        if ($state !== $stored_state) {
-            if (function_exists('error_log')) {
-                error_log('[DND Discord] State mismatch or user not resolved. user_id=' . $user_id . ', stored_state=' . (string)$stored_state);
+        // Verify state if present
+        if ($state) {
+            $stored_state = $user_id ? get_user_meta($user_id, 'discord_auth_state', true) : '';
+            if ($state !== $stored_state) {
+                if (function_exists('error_log')) {
+                    error_log('[DND Discord Page Callback] State mismatch or user not resolved. user_id=' . $user_id . ', stored_state=' . (string)$stored_state);
+                }
+                wp_redirect(home_url());
+                exit;
             }
-            return;
+        } else {
+            if (function_exists('error_log')) {
+                error_log('[DND Discord Page Callback] No state parameter, skipping verification');
+            }
         }
 
         // Exchange code for token
         $client_id = get_option('dnd_discord_client_id');
         $client_secret = get_option('dnd_discord_client_secret');
-        $redirect_uri = get_option('dnd_discord_redirect_page');
-        if ($redirect_uri && strpos($redirect_uri, 'via=connect-dnd-speaking-discord') === false) {
-            $separator = strpos($redirect_uri, '?') !== false ? '&' : '?';
-            $redirect_uri .= $separator . 'via=connect-dnd-speaking-discord';
-        }
+        $redirect_uri = get_option('dnd_discord_redirect_page_full') ?: get_option('dnd_discord_redirect_page') ?: get_site_url();
 
         $response = wp_remote_post('https://discord.com/api/oauth2/token', [
             'headers' => [
@@ -1638,15 +1671,17 @@ class DND_Speaking_REST_API {
 
         if (is_wp_error($response)) {
             if (function_exists('error_log')) {
-                error_log('[DND Discord] Token exchange failed: ' . $response->get_error_message());
+                error_log('[DND Discord Page Callback] Token exchange failed: ' . $response->get_error_message());
             }
-            return;
+            wp_redirect(home_url());
+            exit;
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
         if (function_exists('error_log')) {
-            error_log('[DND Discord] Token response keys: ' . implode(',', array_keys((array)$body)));
+            error_log('[DND Discord Page Callback] Token response keys: ' . implode(',', array_keys((array)$body)));
         }
+        
         if (isset($body['access_token'])) {
             update_user_meta($user_id, 'discord_access_token', $body['access_token']);
             // Persist refresh token/expires/scopes when available
@@ -1671,7 +1706,7 @@ class DND_Speaking_REST_API {
 
             if (is_wp_error($user_response)) {
                 if (function_exists('error_log')) {
-                    error_log('[DND Discord] Failed to fetch user info: ' . $user_response->get_error_message());
+                    error_log('[DND Discord Page Callback] Failed to fetch user info: ' . $user_response->get_error_message());
                 }
             } else {
                 $user_data = json_decode(wp_remote_retrieve_body($user_response), true);
@@ -1686,18 +1721,29 @@ class DND_Speaking_REST_API {
                     update_user_meta($user_id, 'discord_email', $user_data['email']);
                 }
                 if (function_exists('error_log')) {
-                    error_log('[DND Discord] Saved user meta for user_id=' . $user_id);
+                    error_log('[DND Discord Page Callback] Saved user meta for user_id=' . $user_id);
                 }
             }
             // Invalidate one-time state mapping
-            delete_transient('dnd_discord_state_' . $state);
+            if ($state) {
+                delete_transient('dnd_discord_state_' . $state);
+            }
         }
 
-        // Redirect to clean URL without query parameters
+        // Clean URL and redirect back to the same page without parameters
         $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-        $clean_url = remove_query_arg(['code', 'state'], $current_url);
+        $clean_url = remove_query_arg(['code', 'state', 'via'], $current_url);
         wp_redirect($clean_url);
         exit;
+    }
+
+    public function test_endpoint($request) {
+        return [
+            'message' => 'REST API is working!',
+            'timestamp' => time(),
+            'user_id' => get_current_user_id(),
+            'site_url' => get_site_url()
+        ];
     }
 
     public function create_discord_voice_channel($request) {

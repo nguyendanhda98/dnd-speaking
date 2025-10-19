@@ -305,7 +305,7 @@ class DND_Speaking_Admin {
                         <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
                             <label for="dnd_discord_redirect_url" style="width: 150px; font-weight: bold;">Redirect URL</label>
                             <div style="position: relative; width: 300px;">
-                                <input type="text" id="dnd_discord_redirect_url_display" value="<?php echo esc_attr(get_site_url() . '/wp-json/dnd-speaking/v1/discord/callback'); ?>" class="regular-text dnd-discord-redirect-input" readonly style="background-color: #f5f5f5; width: 100%; cursor: pointer; box-sizing: border-box;" />
+                                <input type="text" id="dnd_discord_redirect_url_display" value="<?php echo esc_attr(get_option('dnd_discord_redirect_page_full') ?: get_option('dnd_discord_redirect_page') ?: (get_site_url() . '/wp-json/dnd-speaking/v1/discord/callback')); ?>" class="regular-text dnd-discord-redirect-input" readonly style="background-color: #f5f5f5; width: 100%; cursor: pointer; box-sizing: border-box;" />
                                 <span class="dashicons dashicons-yes dnd-copy-feedback" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #46b450; display: none;"></span>
                             </div>
                         </div>
@@ -432,6 +432,7 @@ class DND_Speaking_Admin {
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_client_secret');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_redirect_url');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_redirect_page');
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_redirect_page_full');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_admin_redirect_url');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_bot_token');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_server_id');
@@ -517,7 +518,8 @@ class DND_Speaking_Admin {
         
         wp_enqueue_script('discord-settings', plugins_url('../assets/js/discord-settings.js', __FILE__), array('jquery'), null, true);
         wp_localize_script('discord-settings', 'dndSettings', array(
-            'ajaxurl' => admin_url('admin-ajax.php')
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'savedRedirectUrl' => get_option('dnd_discord_redirect_page_full')
         ));
     }
 
