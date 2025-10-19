@@ -87,6 +87,20 @@ input:checked + .status-toggle-slider:before {
     font-size: 16px;
 }
 
+.discord-connect-message {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    color: #856404;
+}
+
+.discord-connect-message a {
+    color: #007cba;
+    text-decoration: underline;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .dnd-teacher-status {

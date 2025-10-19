@@ -94,6 +94,12 @@ class DND_Speaking_REST_API {
             'callback' => [$this, 'disconnect_discord'],
             'permission_callback' => [$this, 'check_user_logged_in'],
         ]);
+
+        register_rest_route('dnd-speaking/v1', '/discord/create-voice-channel', [
+            'methods' => 'POST',
+            'callback' => [$this, 'create_discord_voice_channel'],
+            'permission_callback' => [$this, 'check_user_logged_in'],
+        ]);
     }
 
     public function check_user_logged_in() {
@@ -1692,5 +1698,93 @@ class DND_Speaking_REST_API {
         $clean_url = remove_query_arg(['code', 'state'], $current_url);
         wp_redirect($clean_url);
         exit;
+    }
+
+    public function create_discord_voice_channel($request) {
+        $user_id = get_current_user_id();
+        
+        // Check if user is connected to Discord
+        $discord_connected = get_user_meta($user_id, 'discord_connected', true);
+        if (!$discord_connected) {
+            return new WP_Error('discord_not_connected', 'User not connected to Discord', ['status' => 400]);
+        }
+
+        $bot_token = get_option('dnd_discord_bot_token');
+        $guild_id = get_option('dnd_discord_server_id');
+        
+        if (!$bot_token || !$guild_id) {
+            return new WP_Error('discord_config_missing', 'Discord bot token or guild ID not configured', ['status' => 500]);
+        }
+
+        $discord_user_id = get_user_meta($user_id, 'discord_user_id', true);
+        if (!$discord_user_id) {
+            return new WP_Error('discord_user_id_missing', 'Discord user ID not found', ['status' => 400]);
+        }
+
+        // Create private voice channel
+        $channel_name = 'Teacher Room - ' . get_userdata($user_id)->display_name;
+        
+        $response = wp_remote_post("https://discord.com/api/guilds/{$guild_id}/channels", [
+            'headers' => [
+                'Authorization' => 'Bot ' . $bot_token,
+                'Content-Type' => 'application/json'
+            ],
+            'body' => json_encode([
+                'name' => $channel_name,
+                'type' => 2, // Voice channel
+                'parent_id' => null, // No category
+                'permission_overwrites' => [
+                    [
+                        'id' => $guild_id, // @everyone role
+                        'type' => 0, // Role
+                        'deny' => 1024 // VIEW_CHANNEL
+                    ],
+                    [
+                        'id' => $discord_user_id,
+                        'type' => 1, // Member
+                        'allow' => 1024 | 512 | 256 | 128 | 64 // VIEW_CHANNEL, CONNECT, SPEAK, USE_VAD, PRIORITY_SPEAKER
+                    ]
+                ]
+            ])
+        ]);
+
+        if (is_wp_error($response)) {
+            return new WP_Error('discord_api_error', 'Failed to create voice channel', ['status' => 500]);
+        }
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        if (isset($body['id'])) {
+            $channel_id = $body['id'];
+            // Store channel ID for later cleanup
+            update_user_meta($user_id, 'discord_voice_channel_id', $channel_id);
+            
+            // Generate invite link (temporary, expires in 1 hour)
+            $invite_response = wp_remote_post("https://discord.com/api/channels/{$channel_id}/invites", [
+                'headers' => [
+                    'Authorization' => 'Bot ' . $bot_token,
+                    'Content-Type' => 'application/json'
+                ],
+                'body' => json_encode([
+                    'max_age' => 3600, // 1 hour
+                    'max_uses' => 0, // Unlimited uses
+                    'temporary' => false,
+                    'unique' => true
+                ])
+            ]);
+
+            if (!is_wp_error($invite_response)) {
+                $invite_body = json_decode(wp_remote_retrieve_body($invite_response), true);
+                if (isset($invite_body['code'])) {
+                    $invite_link = 'https://discord.gg/' . $invite_body['code'];
+                    update_user_meta($user_id, 'discord_voice_channel_invite', $invite_link);
+                    return ['success' => true, 'invite_link' => $invite_link];
+                }
+            }
+            
+            // If invite fails, return channel ID
+            return ['success' => true, 'channel_id' => $channel_id];
+        }
+
+        return new WP_Error('discord_channel_creation_failed', 'Failed to create voice channel', ['status' => 500]);
     }
 }

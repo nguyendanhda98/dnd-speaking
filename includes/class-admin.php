@@ -318,6 +318,11 @@ class DND_Speaking_Admin {
                         </div>
                         <p class="description" style="margin-left: 160px; margin-top: -10px;">Select the page where users will be redirected after Discord authentication</p>
                         <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <label for="dnd_discord_generated_url" style="width: 150px; font-weight: bold;">Generated URL</label>
+                            <input type="url" id="dnd_discord_generated_url" name="dnd_discord_generated_url" value="<?php echo esc_attr(get_option('dnd_discord_generated_url')); ?>" style="max-width: 300px;" />
+                        </div>
+                        <p class="description" style="margin-left: 160px; margin-top: -10px;">Paste your URL from https://discord.com/developers/applications -> OAuth2 -> Generated URL</p>
+                        <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px;">
                             <label for="dnd_discord_admin_redirect_url" style="width: 150px; font-weight: bold;">Admin Redirect URL</label>
                             <input type="url" id="dnd_discord_admin_redirect_url" name="dnd_discord_admin_redirect_url" value="<?php echo esc_attr(get_option('dnd_discord_admin_redirect_url')); ?>" style="max-width: 300px;" />
                         </div>
@@ -431,6 +436,7 @@ class DND_Speaking_Admin {
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_bot_token');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_server_id');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_connect_to_bot');
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_generated_url');
 
         add_settings_section(
             'dnd_speaking_discord_app_details',
@@ -703,8 +709,61 @@ class DND_Speaking_Admin {
             wp_die('Unauthorized');
         }
 
-        update_user_meta($user_id, 'dnd_available', $available);
+        if ($available == 1) {
+            // Check if teacher is connected to Discord
+            $discord_connected = get_user_meta($user_id, 'discord_connected', true);
+            if (!$discord_connected) {
+                wp_send_json_error(['message' => 'Bạn chưa kết nối với tài khoản Discord. Vui lòng kết nối để có thể nhận học viên.', 'need_discord' => true]);
+                return;
+            }
 
+            // Create Discord voice channel
+            $api_response = wp_remote_post(get_rest_url() . 'dnd-speaking/v1/discord/create-voice-channel', [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'X-WP-Nonce' => wp_create_nonce('wp_rest')
+                ],
+                'body' => json_encode([]),
+                'timeout' => 30
+            ]);
+
+            if (is_wp_error($api_response)) {
+                wp_send_json_error(['message' => 'Không thể tạo phòng Discord. Vui lòng thử lại.']);
+                return;
+            }
+
+            $body = json_decode(wp_remote_retrieve_body($api_response), true);
+            if (isset($body['invite_link'])) {
+                update_user_meta($user_id, 'dnd_available', $available);
+                wp_send_json_success(['available' => $available, 'invite_link' => $body['invite_link']]);
+                return;
+            } else {
+                wp_send_json_error(['message' => 'Không thể tạo link mời Discord.']);
+                return;
+            }
+        } else {
+            // When going offline, delete existing voice channel
+            $channel_id = get_user_meta($user_id, 'discord_voice_channel_id', true);
+            if ($channel_id) {
+                $bot_token = get_option('dnd_discord_bot_token');
+                $guild_id = get_option('dnd_discord_server_id');
+                
+                if ($bot_token && $guild_id) {
+                    wp_remote_request("https://discord.com/api/channels/{$channel_id}", [
+                        'method' => 'DELETE',
+                        'headers' => [
+                            'Authorization' => 'Bot ' . $bot_token
+                        ]
+                    ]);
+                }
+                
+                // Clean up meta
+                delete_user_meta($user_id, 'discord_voice_channel_id');
+                delete_user_meta($user_id, 'discord_voice_channel_invite');
+            }
+        }
+
+        update_user_meta($user_id, 'dnd_available', $available);
         wp_send_json_success(['available' => $available]);
     }
 

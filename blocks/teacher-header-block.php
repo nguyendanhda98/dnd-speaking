@@ -58,6 +58,8 @@ class DND_Speaking_Teacher_Status_Block {
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'rest_url' => rest_url('dnd-speaking/v1/'),
                 'nonce' => wp_create_nonce('update_teacher_availability_nonce'),
+                'rest_nonce' => wp_create_nonce('wp_rest'),
+                'discord_auth_url' => get_option('dnd_discord_generated_url'),
             ]);
         }
     }
@@ -69,6 +71,9 @@ class DND_Speaking_Teacher_Status_Block {
 
         $user_id = get_current_user_id();
         $available = get_user_meta($user_id, 'dnd_available', true) == '1';
+        $invite_link = get_user_meta($user_id, 'discord_voice_channel_invite', true);
+        $room_link = $invite_link ?: '#';
+        $room_text = $invite_link ? 'Tham gia phòng' : 'Link room';
 
         $output = '<div class="dnd-teacher-status">';
         
@@ -83,12 +88,13 @@ class DND_Speaking_Teacher_Status_Block {
         $output .= '</label>';
         $output .= '<span class="status-text online">Online</span>';
         $output .= '</div>';
+        $output .= '<div id="discord-connect-message" class="discord-connect-message" style="display: none;"></div>';
         $output .= '</div>';
         
         // Phần 2: Room
         $output .= '<div class="room-section">';
         $output .= '<span class="room-label">Room:</span>';
-        $output .= '<a href="#" class="room-link">Link room</a>';
+        $output .= '<a href="' . esc_url($room_link) . '" class="room-link" target="_blank">' . esc_html($room_text) . '</a>';
         $output .= '</div>';
         
         $output .= '</div>';
