@@ -10,6 +10,25 @@ jQuery(document).ready(function($) {
         const isAvailable = $(this).is(':checked');
         const userId = dnd_teacher_data.user_id;
 
+        // Show confirmation dialog
+        const confirmMessage = isAvailable 
+            ? 'Bạn có chắc muốn chuyển sang trạng thái Online?' 
+            : 'Bạn có chắc muốn chuyển sang trạng thái Offline?';
+        
+        if (!confirm(confirmMessage)) {
+            // User cancelled, revert toggle
+            $toggle.prop('checked', !isAvailable);
+            return;
+        }
+
+        // Show loading message when going online
+        if (isAvailable) {
+            $discordMessage.html('<span style="color: #0066cc;">⏳ Đang tạo phòng học...</span>');
+            $discordMessage.show();
+        } else {
+            $discordMessage.hide();
+        }
+
         $.ajax({
             url: dnd_teacher_data.ajax_url,
             method: 'POST',
@@ -22,13 +41,18 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.success) {
                     if (response.data.invite_link) {
+                        // Room created successfully
                         $roomLink.attr('href', response.data.invite_link).text('Tham gia phòng');
+                        $discordMessage.html('<span style="color: #00aa00;">✓ Tạo phòng thành công!</span>');
+                        // Hide success message after 3 seconds
+                        setTimeout(function() {
+                            $discordMessage.fadeOut();
+                        }, 3000);
                     } else {
                         // When going offline, reset link
                         $roomLink.attr('href', '#').text('Link room');
+                        $discordMessage.hide();
                     }
-                    // Hide discord message when successful
-                    $discordMessage.hide();
                     console.log('Availability updated successfully');
                 } else {
                     if (response.data && response.data.need_discord) {
@@ -49,7 +73,8 @@ jQuery(document).ready(function($) {
                         // Revert toggle
                         $toggle.prop('checked', false);
                     } else {
-                        alert(response.data ? response.data.message : 'Có lỗi xảy ra. Vui lòng thử lại.');
+                        $discordMessage.html('<span style="color: #cc0000;">✗ ' + (response.data ? response.data.message : 'Có lỗi xảy ra. Vui lòng thử lại.') + '</span>');
+                        $discordMessage.show();
                     }
                     // Revert toggle on error
                     $toggle.prop('checked', !isAvailable);
@@ -57,7 +82,8 @@ jQuery(document).ready(function($) {
             },
             error: function(xhr, status, error) {
                 console.error('Error updating availability:', error);
-                alert('Có lỗi xảy ra. Vui lòng thử lại.');
+                $discordMessage.html('<span style="color: #cc0000;">✗ Có lỗi xảy ra. Vui lòng thử lại.</span>');
+                $discordMessage.show();
                 // Revert toggle on error
                 $toggle.prop('checked', !isAvailable);
             }
