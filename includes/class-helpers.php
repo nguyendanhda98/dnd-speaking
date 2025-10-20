@@ -16,11 +16,37 @@ class DND_Speaking_Helpers {
         global $wpdb;
         $table = $wpdb->prefix . 'dnd_speaking_credits';
         $existing = self::get_user_credits($user_id);
-        if ($existing > 0) {
-            $wpdb->update($table, ['credits' => $existing + $amount], ['user_id' => $user_id]);
+        $new_credits = $existing + $amount;
+        
+        // Check if user exists in credits table
+        $exists = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE user_id = %d", $user_id));
+        
+        if ($exists > 0) {
+            $result = $wpdb->update(
+                $table, 
+                ['credits' => $new_credits], 
+                ['user_id' => $user_id],
+                ['%d'], // format for credits
+                ['%d']  // format for user_id
+            );
         } else {
-            $wpdb->insert($table, ['user_id' => $user_id, 'credits' => $amount]);
+            $result = $wpdb->insert(
+                $table, 
+                ['user_id' => $user_id, 'credits' => $new_credits],
+                ['%d', '%d'] // formats for user_id and credits
+            );
         }
+        
+        if ($result === false) {
+            error_log("ADD CREDIT FAILED - Database error for user {$user_id}: " . $wpdb->last_error);
+            return false;
+        }
+        
+        // Log the addition
+        self::log_action($user_id, 'credit_added', "Added {$amount} credit(s). Balance: {$new_credits}");
+        error_log("CREDIT ADDED - User {$user_id}: +{$amount} credit(s), new balance: {$new_credits}");
+        
+        return true;
     }
 
     public static function deduct_user_credits($user_id, $amount = 1) {
@@ -65,10 +91,28 @@ class DND_Speaking_Helpers {
         $current_credits = self::get_user_credits($user_id);
         $new_credits = $current_credits + $amount;
         
-        if ($current_credits > 0) {
-            $wpdb->update($table, ['credits' => $new_credits], ['user_id' => $user_id]);
+        // Check if user exists in credits table
+        $exists = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE user_id = %d", $user_id));
+        
+        if ($exists > 0) {
+            $result = $wpdb->update(
+                $table, 
+                ['credits' => $new_credits], 
+                ['user_id' => $user_id],
+                ['%d'], // format for credits
+                ['%d']  // format for user_id
+            );
         } else {
-            $wpdb->insert($table, ['user_id' => $user_id, 'credits' => $amount]);
+            $result = $wpdb->insert(
+                $table, 
+                ['user_id' => $user_id, 'credits' => $new_credits],
+                ['%d', '%d'] // formats for user_id and credits
+            );
+        }
+        
+        if ($result === false) {
+            error_log("CREDIT REFUND FAILED - Database error for user {$user_id}: " . $wpdb->last_error);
+            return false;
         }
         
         // Log the refund
@@ -77,6 +121,7 @@ class DND_Speaking_Helpers {
             $log_message .= " Reason: {$reason}";
         }
         self::log_action($user_id, 'credit_refunded', $log_message);
+        error_log("CREDIT REFUNDED - User {$user_id}: +{$amount} credit(s), new balance: {$new_credits}. Reason: " . ($reason ?: 'N/A'));
         
         return true;
     }

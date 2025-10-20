@@ -10,6 +10,7 @@ class DND_Speaking_Admin {
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_notices', [$this, 'display_admin_notices']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
+        add_action('admin_post_add_credits', [$this, 'handle_add_credits']);
         add_action('wp_ajax_update_teacher_availability', [$this, 'update_teacher_availability']);
         add_action('wp_ajax_handle_teacher_request', [$this, 'handle_teacher_request']);
         add_action('wp_ajax_handle_upcoming_session', [$this, 'handle_upcoming_session']);
@@ -90,7 +91,11 @@ class DND_Speaking_Admin {
         $students = $wpdb->get_results("SELECT * FROM $table ORDER BY credits DESC");
 
         if (isset($_GET['added'])) {
-            echo '<div class="notice notice-success"><p>Credits added successfully.</p></div>';
+            echo '<div class="notice notice-success is-dismissible"><p>Credits added successfully.</p></div>';
+        }
+        
+        if (isset($_GET['error'])) {
+            echo '<div class="notice notice-error is-dismissible"><p>Failed to add credits. Please check the logs for more details.</p></div>';
         }
 
         ?>
@@ -714,7 +719,7 @@ class DND_Speaking_Admin {
 
     public function handle_add_credits() {
         // Check nonce for security
-        if (!wp_verify_nonce($_POST['_wpnonce'], 'add_credits_nonce')) {
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'add_credits_nonce')) {
             wp_die('Security check failed');
         }
 
@@ -723,16 +728,31 @@ class DND_Speaking_Admin {
             wp_die('Unauthorized');
         }
 
-        $user_id = intval($_POST['user_id']);
-        $credits = intval($_POST['credits']);
+        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+        $credits = isset($_POST['credits']) ? intval($_POST['credits']) : 0;
 
         // Validate input
         if ($user_id <= 0 || $credits <= 0) {
-            wp_die('Invalid input');
+            wp_die('Invalid input: User ID and Credits must be positive numbers');
+        }
+
+        // Verify user exists
+        $user = get_user_by('id', $user_id);
+        if (!$user) {
+            wp_die('User not found');
         }
 
         // Add credits using helper function
-        DND_Speaking_Helpers::add_user_credits($user_id, $credits);
+        $result = DND_Speaking_Helpers::add_user_credits($user_id, $credits);
+
+        if ($result === false) {
+            // Log the action
+            DND_Speaking_Helpers::log_action(get_current_user_id(), 'add_credits_failed', "Failed to add $credits credits to user $user_id");
+            
+            // Redirect back with error message
+            wp_redirect(admin_url('admin.php?page=dnd-speaking-students&error=1'));
+            exit;
+        }
 
         // Log the action
         DND_Speaking_Helpers::log_action(get_current_user_id(), 'add_credits', "Added $credits credits to user $user_id");
@@ -901,25 +921,12 @@ class DND_Speaking_Admin {
             wp_send_json_error('Failed to update session');
         }
 
-        // If accepted, deduct credits from student
-        if ($action === 'accept') {
-            $student_id = $session->student_id;
-            if (!DND_Speaking_Helpers::deduct_user_credits($student_id)) {
-                // Rollback session confirmation if credit deduction fails
-                $wpdb->update(
-                    $sessions_table,
-                    ['status' => 'pending'],
-                    ['id' => $session_id],
-                    ['%s'],
-                    ['%d']
-                );
-                wp_send_json_error('Student does not have enough credits');
-            }
-        }
-
-        // If declined, we might want to refund credits or notify the student
+        // Credits are already deducted when student books
+        // If accepted, no need to deduct again
+        // If declined, refund the credits
         if ($action === 'decline') {
-            // No refund needed since credits weren't deducted yet
+            $student_id = $session->student_id;
+            DND_Speaking_Helpers::refund_user_credits($student_id, 1, 'Teacher declined session');
         }
 
         wp_send_json_success(['status' => $new_status]);
@@ -983,9 +990,10 @@ class DND_Speaking_Admin {
                 wp_send_json_error('Failed to cancel session');
             }
 
-            // Refund credits to student when teacher cancels
+            // Teacher cancels confirmed session - ALWAYS refund credits to student
             $student_id = $session->student_id;
-            DND_Speaking_Helpers::refund_user_credits($student_id, 1, 'Teacher cancelled session');
+            DND_Speaking_Helpers::refund_user_credits($student_id, 1, 'Teacher cancelled confirmed session');
+            error_log('TEACHER CANCEL CONFIRMED SESSION (via handle_upcoming_session) - Refunded 1 credit to student: ' . $student_id);
 
             wp_send_json_success(['status' => 'cancelled', 'action' => 'cancelled']);
         }

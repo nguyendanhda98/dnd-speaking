@@ -58,7 +58,11 @@ jQuery(document).ready(function($) {
         let confirmMessage = 'Bạn có chắc muốn hủy buổi học này?';
         let willRefund = true;
         
-        if (sessionStatus === 'confirmed' && sessionTime) {
+        if (sessionStatus === 'pending') {
+            // Pending - always refund (teacher hasn't accepted yet)
+            confirmMessage = 'Buổi học chưa được giáo viên xác nhận, bạn sẽ được hoàn lại 1 buổi học.\n\nBạn có chắc muốn hủy?';
+        } else if (sessionStatus === 'confirmed' && sessionTime) {
+            // Confirmed - check 24h rule
             const now = Math.floor(Date.now() / 1000); // Current timestamp in seconds
             const hoursUntilSession = (sessionTime - now) / 3600;
             
@@ -68,6 +72,10 @@ jQuery(document).ready(function($) {
             } else if (hoursUntilSession > 24) {
                 confirmMessage = 'Buổi học còn hơn 24 giờ nữa, bạn sẽ được hoàn lại 1 buổi học.\n\nBạn có chắc muốn hủy?';
             }
+        } else if (sessionStatus === 'in_progress') {
+            // In-progress - NEVER refund (student already joined)
+            willRefund = false;
+            confirmMessage = 'Buổi học đang diễn ra hoặc bạn đã tham gia. Bạn sẽ KHÔNG được hoàn lại buổi học nếu hủy.\n\nBạn có chắc muốn tiếp tục hủy?';
         }
         
         if (confirm(confirmMessage)) {
