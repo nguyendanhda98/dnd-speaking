@@ -51,8 +51,26 @@ jQuery(document).ready(function($) {
     $sessionsBlock.on('click', '.dnd-btn-cancel', function() {
         const $button = $(this);
         const sessionId = $button.data('session-id');
+        const sessionTime = $button.data('session-time');
+        const sessionStatus = $button.data('session-status');
         
-        if (confirm('Bạn có chắc muốn hủy buổi học này?')) {
+        // Check if this is a confirmed session and if it's within 24 hours
+        let confirmMessage = 'Bạn có chắc muốn hủy buổi học này?';
+        let willRefund = true;
+        
+        if (sessionStatus === 'confirmed' && sessionTime) {
+            const now = Math.floor(Date.now() / 1000); // Current timestamp in seconds
+            const hoursUntilSession = (sessionTime - now) / 3600;
+            
+            if (hoursUntilSession <= 24 && hoursUntilSession > 0) {
+                willRefund = false;
+                confirmMessage = 'Buổi học sẽ diễn ra trong vòng 24 giờ nữa, nên bạn sẽ KHÔNG được hoàn lại buổi học nếu hủy.\n\nBạn có chắc muốn tiếp tục hủy?';
+            } else if (hoursUntilSession > 24) {
+                confirmMessage = 'Buổi học còn hơn 24 giờ nữa, bạn sẽ được hoàn lại 1 buổi học.\n\nBạn có chắc muốn hủy?';
+            }
+        }
+        
+        if (confirm(confirmMessage)) {
             // Disable button and show loading
             $button.prop('disabled', true).text('Đang xử lý...');
             cancelSession(sessionId, $button);
@@ -127,6 +145,10 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
+                    // Show success message
+                    if (response.message) {
+                        alert(response.message);
+                    }
                     loadSessions(); // Reload after cancel
                 } else {
                     // Re-enable button on error

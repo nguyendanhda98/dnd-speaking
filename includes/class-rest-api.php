@@ -431,6 +431,25 @@ class DND_Speaking_REST_API {
         $teacher_id = $session->teacher_id;
         $has_room_link = !empty($session->discord_channel);
 
+        // Check if this is a future confirmed/pending session and if cancelled more than 24 hours before
+        $should_refund = false;
+        $hours_until_session = 0;
+        $is_confirmed_session = false;
+        
+        if (in_array($session->status, ['confirmed', 'pending']) && !empty($session->start_time)) {
+            $session_timestamp = strtotime($session->start_time);
+            $current_timestamp = current_time('timestamp');
+            $hours_until_session = ($session_timestamp - $current_timestamp) / 3600;
+            $is_confirmed_session = ($session->status === 'confirmed');
+            
+            if ($hours_until_session > 24) {
+                $should_refund = true;
+                error_log('STUDENT CANCEL - Session is more than 24 hours away (' . round($hours_until_session, 2) . ' hours). Will refund credit.');
+            } else {
+                error_log('STUDENT CANCEL - Session is less than 24 hours away (' . round($hours_until_session, 2) . ' hours). No refund.');
+            }
+        }
+
         // If session is in_progress with room link, send webhook to clean up Discord room
         if ($session->status === 'in_progress' && $has_room_link) {
             $webhook_url = get_option('dnd_discord_webhook');
@@ -504,8 +523,24 @@ class DND_Speaking_REST_API {
         }
         
         $wpdb->update($table, $update_data, ['id' => $session_id]);
+        
+        // Refund credit if eligible
+        // For confirmed/pending sessions: refund if cancelled more than 24 hours before
+        // For in-progress sessions: no refund (student already started the session)
+        $refunded = false;
+        if ($should_refund && $session->status === 'confirmed') {
+            DND_Speaking_Helpers::refund_user_credits($user_id, 1, 'Student cancelled more than 24 hours before session');
+            $refunded = true;
+        } else if ($session->status === 'pending') {
+            // Pending sessions haven't been confirmed yet, so no credit was deducted
+            // No refund needed
+        }
 
-        return ['success' => true];
+        return [
+            'success' => true,
+            'refunded' => $refunded,
+            'message' => $refunded ? 'Đã hủy buổi học và hoàn lại 1 buổi.' : 'Đã hủy buổi học.'
+        ];
     }
 
     public function book_session($request) {
@@ -601,10 +636,8 @@ class DND_Speaking_REST_API {
             return new WP_Error('slot_taken', 'This time slot is no longer available', ['status' => 400]);
         }
 
-        // Check credits
-        if (!DND_Speaking_Helpers::deduct_user_credits($student_id)) {
-            return new WP_Error('insufficient_credits', 'Not enough credits', ['status' => 400]);
-        }
+        // Don't deduct credits here - wait for teacher confirmation
+        // Credits will be deducted when teacher accepts the session
 
         // Book the session
         $insert_data = [
@@ -1218,8 +1251,31 @@ class DND_Speaking_REST_API {
             // Reset teacher status to offline (not available)
             update_user_meta($user_id, 'dnd_available', '0');
             
+            // Refund credits to student when teacher cancels
+            $student_id = $session->student_id;
+            DND_Speaking_Helpers::refund_user_credits($student_id, 1, 'Teacher cancelled in-progress session');
+            
             $room_cleared = true;
             error_log('TEACHER CANCEL IN_PROGRESS SESSION - Cleaned up room metadata and set status to offline for teacher: ' . $user_id);
+        }
+        
+        // Case 1.5: Cancelling a confirmed session (not yet started)
+        if ($new_status === 'cancelled' && $session->status === 'confirmed') {
+            // Refund credits to student when teacher cancels a confirmed session
+            $student_id = $session->student_id;
+            DND_Speaking_Helpers::refund_user_credits($student_id, 1, 'Teacher cancelled confirmed session');
+            error_log('TEACHER CANCEL CONFIRMED SESSION - Refunded 1 credit to student: ' . $student_id);
+        }
+        
+        // Case 1.6: Confirming a pending session - DEDUCT CREDIT
+        if ($new_status === 'confirmed' && $session->status === 'pending') {
+            $student_id = $session->student_id;
+            if (!DND_Speaking_Helpers::deduct_user_credits($student_id, 1)) {
+                error_log('TEACHER CONFIRM SESSION - Failed to deduct credit from student: ' . $student_id);
+                wp_send_json_error('Học viên không đủ buổi học để xác nhận');
+                return;
+            }
+            error_log('TEACHER CONFIRM SESSION - Deducted 1 credit from student: ' . $student_id);
         }
         
         // Case 2: Completing an in_progress session with a room
@@ -1399,11 +1455,19 @@ class DND_Speaking_REST_API {
         $status_class = '';
         $actions = '';
 
+        // Calculate session timestamp for cancel warning
+        $session_timestamp = '';
+        if (!empty($session->start_time)) {
+            $session_timestamp = strtotime($session->start_time);
+        } else if (!empty($session->session_date) && !empty($session->session_time)) {
+            $session_timestamp = strtotime($session->session_date . ' ' . $session->session_time);
+        }
+
         switch ($session->status) {
             case 'pending':
                 $status_text = 'Chờ xác nhận';
                 $status_class = 'pending';
-                $actions = '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
+                $actions = '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '" data-session-time="' . $session_timestamp . '" data-session-status="pending">Hủy</button>';
                 break;
             case 'confirmed':
                 $status_text = 'Đã xác nhận';
@@ -1415,7 +1479,7 @@ class DND_Speaking_REST_API {
                 } else {
                     $actions = '';
                 }
-                $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
+                $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '" data-session-time="' . $session_timestamp . '" data-session-status="confirmed">Hủy</button>';
                 break;
             case 'in_progress':
                 $status_text = 'Đang diễn ra';
@@ -1427,7 +1491,7 @@ class DND_Speaking_REST_API {
                 } else {
                     $actions = '';
                 }
-                $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
+                $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '" data-session-time="' . $session_timestamp . '" data-session-status="in_progress">Hủy</button>';
                 break;
             case 'completed':
                 $status_text = 'Hoàn thành';
@@ -2140,6 +2204,11 @@ class DND_Speaking_REST_API {
             // Discord channel links format: https://discord.com/channels/SERVER_ID/CHANNEL_ID
             $server_id = get_option('dnd_discord_server_id');
             $room_link = "https://discord.com/channels/{$server_id}/{$room_id}";
+        }
+        
+        // Deduct credit now that we successfully got the room link
+        if (!DND_Speaking_Helpers::deduct_user_credits($user_id)) {
+            return new WP_Error('insufficient_credits', 'Không đủ buổi học để tham gia', ['status' => 400]);
         }
         
         // Create confirmed session

@@ -199,11 +199,19 @@ class DND_Speaking_Student_Sessions_Block {
         $status_class = '';
         $actions = '';
 
+        // Calculate session timestamp for cancel warning
+        $session_timestamp = '';
+        if (!empty($session->start_time)) {
+            $session_timestamp = strtotime($session->start_time);
+        } else if (!empty($session->session_date) && !empty($session->session_time)) {
+            $session_timestamp = strtotime($session->session_date . ' ' . $session->session_time);
+        }
+        
         switch ($session->status) {
             case 'pending':
                 $status_text = 'Chờ xác nhận';
                 $status_class = 'pending';
-                $actions = '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
+                $actions = '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '" data-session-time="' . $session_timestamp . '" data-session-status="pending">Hủy</button>';
                 break;
             case 'confirmed':
                 $status_text = 'Đã xác nhận';
@@ -213,7 +221,7 @@ class DND_Speaking_Student_Sessions_Block {
                 if (!empty($session->discord_channel)) {
                     $actions = '<a href="' . esc_url($session->discord_channel) . '" target="_blank" class="dnd-btn dnd-btn-join">Tham gia phòng</a>';
                 }
-                $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
+                $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '" data-session-time="' . $session_timestamp . '" data-session-status="confirmed">Hủy</button>';
                 
                 // Check if within 15 minutes before scheduled start time
                 if (!empty($session->session_date) && !empty($session->session_time)) {

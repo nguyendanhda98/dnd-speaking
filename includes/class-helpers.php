@@ -24,7 +24,60 @@ class DND_Speaking_Helpers {
     }
 
     public static function deduct_user_credits($user_id, $amount = 1) {
-        // Temporarily disabled
+        global $wpdb;
+        $table = $wpdb->prefix . 'dnd_speaking_credits';
+        $current_credits = self::get_user_credits($user_id);
+        
+        if ($current_credits < $amount) {
+            error_log("CREDIT DEDUCTION FAILED - User {$user_id} has {$current_credits} credits, needs {$amount}");
+            return false;
+        }
+        
+        $new_credits = $current_credits - $amount;
+        
+        // Check if user exists in credits table
+        $exists = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE user_id = %d", $user_id));
+        
+        if ($exists > 0) {
+            $result = $wpdb->update($table, ['credits' => $new_credits], ['user_id' => $user_id], ['%d'], ['%d']);
+        } else {
+            // User doesn't exist, insert with 0 credits (shouldn't happen but handle it)
+            $result = $wpdb->insert($table, ['user_id' => $user_id, 'credits' => 0], ['%d', '%d']);
+            error_log("CREDIT DEDUCTION - User {$user_id} not found in credits table, created with 0 credits");
+            return false;
+        }
+        
+        if ($result === false) {
+            error_log("CREDIT DEDUCTION FAILED - Database error for user {$user_id}: " . $wpdb->last_error);
+            return false;
+        }
+        
+        // Log the deduction
+        self::log_action($user_id, 'credit_deducted', "Deducted {$amount} credit(s). Balance: {$new_credits}");
+        error_log("CREDIT DEDUCTED - User {$user_id}: -{$amount} credit(s), new balance: {$new_credits}");
+        
+        return true;
+    }
+    
+    public static function refund_user_credits($user_id, $amount = 1, $reason = '') {
+        global $wpdb;
+        $table = $wpdb->prefix . 'dnd_speaking_credits';
+        $current_credits = self::get_user_credits($user_id);
+        $new_credits = $current_credits + $amount;
+        
+        if ($current_credits > 0) {
+            $wpdb->update($table, ['credits' => $new_credits], ['user_id' => $user_id]);
+        } else {
+            $wpdb->insert($table, ['user_id' => $user_id, 'credits' => $amount]);
+        }
+        
+        // Log the refund
+        $log_message = "Refunded {$amount} credit(s). Balance: {$new_credits}";
+        if ($reason) {
+            $log_message .= " Reason: {$reason}";
+        }
+        self::log_action($user_id, 'credit_refunded', $log_message);
+        
         return true;
     }
 

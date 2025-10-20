@@ -901,10 +901,25 @@ class DND_Speaking_Admin {
             wp_send_json_error('Failed to update session');
         }
 
+        // If accepted, deduct credits from student
+        if ($action === 'accept') {
+            $student_id = $session->student_id;
+            if (!DND_Speaking_Helpers::deduct_user_credits($student_id)) {
+                // Rollback session confirmation if credit deduction fails
+                $wpdb->update(
+                    $sessions_table,
+                    ['status' => 'pending'],
+                    ['id' => $session_id],
+                    ['%s'],
+                    ['%d']
+                );
+                wp_send_json_error('Student does not have enough credits');
+            }
+        }
+
         // If declined, we might want to refund credits or notify the student
         if ($action === 'decline') {
-            // Optionally refund credits to student
-            // This would depend on your business logic
+            // No refund needed since credits weren't deducted yet
         }
 
         wp_send_json_success(['status' => $new_status]);
@@ -968,8 +983,9 @@ class DND_Speaking_Admin {
                 wp_send_json_error('Failed to cancel session');
             }
 
-            // Optionally refund credits to student
-            // This would depend on your business logic
+            // Refund credits to student when teacher cancels
+            $student_id = $session->student_id;
+            DND_Speaking_Helpers::refund_user_credits($student_id, 1, 'Teacher cancelled session');
 
             wp_send_json_success(['status' => 'cancelled', 'action' => 'cancelled']);
         }
