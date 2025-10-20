@@ -49,9 +49,13 @@ jQuery(document).ready(function($) {
 
     // Handle cancel buttons
     $sessionsBlock.on('click', '.dnd-btn-cancel', function() {
-        const sessionId = $(this).data('session-id');
+        const $button = $(this);
+        const sessionId = $button.data('session-id');
+        
         if (confirm('Bạn có chắc muốn hủy buổi học này?')) {
-            cancelSession(sessionId);
+            // Disable button and show loading
+            $button.prop('disabled', true).text('Đang xử lý...');
+            cancelSession(sessionId, $button);
         }
     });
 
@@ -111,7 +115,7 @@ jQuery(document).ready(function($) {
         $('.dnd-filter-btn[data-filter="' + currentFilter + '"]').addClass('active');
     }
 
-    function cancelSession(sessionId) {
+    function cancelSession(sessionId, $button) {
         $.ajax({
             url: dnd_speaking_data.rest_url + 'cancel-session',
             method: 'POST',
@@ -125,10 +129,18 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     loadSessions(); // Reload after cancel
                 } else {
-                    alert('Không thể hủy buổi học. Vui lòng thử lại.');
+                    // Re-enable button on error
+                    if ($button) {
+                        $button.prop('disabled', false).text('Hủy');
+                    }
+                    alert(response.message || 'Không thể hủy buổi học. Vui lòng thử lại.');
                 }
             },
             error: function(xhr, status, error) {
+                // Re-enable button on error
+                if ($button) {
+                    $button.prop('disabled', false).text('Hủy');
+                }
                 console.error('Error canceling session:', xhr.responseText, status, error);
                 alert('Có lỗi xảy ra khi hủy buổi học.');
             }

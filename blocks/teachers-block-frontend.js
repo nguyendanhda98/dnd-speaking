@@ -108,15 +108,24 @@ jQuery(document).ready(function($) {
         // });
 
         $('.dnd-btn-start').on('click', function() {
-            const teacherId = $(this).data('teacher-id');
-            const teacherName = $(this).closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
-            startNowSession(teacherId, teacherName);
+            const $button = $(this);
+            const teacherId = $button.data('teacher-id');
+            const teacherName = $button.closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
+            
+            // Disable button immediately to prevent spam
+            $button.prop('disabled', true).text('Đang xử lý...');
+            
+            startNowSession(teacherId, teacherName, $button);
         });
     }
 
-    function startNowSession(teacherId, teacherName) {
+    function startNowSession(teacherId, teacherName, $button) {
         // Show confirmation dialog
         if (!confirm(`Bạn có muốn bắt đầu phiên học với ${teacherName} ngay bây giờ không?`)) {
+            // User cancelled, re-enable button
+            if ($button) {
+                $button.prop('disabled', false).text('🎤 Start Now');
+            }
             return;
         }
 
@@ -140,10 +149,16 @@ jQuery(document).ready(function($) {
                     // Successfully created session, redirect directly to Discord room
                     window.location.href = response.room_link;
                 } else if (response.teacher_not_available) {
-                    // Teacher is offline or busy
+                    // Teacher is offline or busy - re-enable button
+                    if ($button) {
+                        $button.prop('disabled', false).text('🎤 Start Now');
+                    }
                     alert(response.message);
                 } else if (response.need_discord_connection) {
-                    // Need to connect Discord first
+                    // Need to connect Discord first - re-enable button
+                    if ($button) {
+                        $button.prop('disabled', false).text('🎤 Start Now');
+                    }
                     if (confirm(response.message + '\n\nBạn có muốn kết nối Discord ngay bây giờ không?')) {
                         window.location.href = response.discord_auth_url;
                     }
@@ -152,13 +167,28 @@ jQuery(document).ready(function($) {
                     if (confirm(response.message)) {
                         // Redirect to existing room
                         window.location.href = response.room_link;
+                    } else {
+                        // User doesn't want to join existing room - re-enable button
+                        if ($button) {
+                            $button.prop('disabled', false).text('🎤 Start Now');
+                        }
                     }
                 } else {
+                    // Other error - re-enable button
+                    if ($button) {
+                        $button.prop('disabled', false).text('🎤 Start Now');
+                    }
                     alert(response.message || 'Có lỗi xảy ra, vui lòng thử lại.');
                 }
             },
             error: function(xhr) {
                 $loadingModal.remove();
+                
+                // Re-enable button on error
+                if ($button) {
+                    $button.prop('disabled', false).text('🎤 Start Now');
+                }
+                
                 const errorMessage = xhr.responseJSON && xhr.responseJSON.message 
                     ? xhr.responseJSON.message 
                     : 'Có lỗi xảy ra khi tạo phiên học.';
@@ -266,13 +296,16 @@ jQuery(document).ready(function($) {
 
         // Handle booking confirmation
         $('#dnd-confirm-booking').off('click').on('click', function() {
+            const $button = $(this);
             if (selectedSlot) {
-                bookSession(teacherId, selectedSlot);
+                // Disable button to prevent spam
+                $button.prop('disabled', true).text('Đang đặt lịch...');
+                bookSession(teacherId, selectedSlot, $button);
             }
         });
     }
 
-    function bookSession(teacherId, datetime) {
+    function bookSession(teacherId, datetime, $button) {
         const studentId = dnd_speaking_data.user_id;
         $.ajax({
             url: dnd_speaking_data.rest_url + 'book-session',
@@ -289,15 +322,27 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     alert('Session booked successfully!');
                     $('#dnd-booking-modal').removeClass('show');
+                    // Re-enable button
+                    if ($button) {
+                        $button.prop('disabled', false).text('Xác nhận đặt lịch');
+                    }
                     // Refresh upcoming sessions if needed
                     if (typeof window.refreshStudentSessions === 'function') {
                         window.refreshStudentSessions();
                     }
                 } else {
+                    // Re-enable button on error
+                    if ($button) {
+                        $button.prop('disabled', false).text('Xác nhận đặt lịch');
+                    }
                     alert('Failed to book session: ' + (response.message || 'Unknown error'));
                 }
             },
             error: function(xhr) {
+                // Re-enable button on error
+                if ($button) {
+                    $button.prop('disabled', false).text('Xác nhận đặt lịch');
+                }
                 alert('Error booking session: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error'));
             }
         });

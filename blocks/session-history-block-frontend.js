@@ -84,23 +84,35 @@ jQuery(document).ready(function($) {
 
     // Handle action buttons
     $historyBlock.on('click', '.dnd-btn-confirm', function() {
-        const sessionId = $(this).data('session-id');
+        const $button = $(this);
+        const sessionId = $button.data('session-id');
+        
         if (confirm('Bạn có chắc muốn xác nhận buổi học này?')) {
-            updateSessionStatus(sessionId, 'confirmed');
+            // Disable button and show loading
+            $button.prop('disabled', true).text('Đang xử lý...');
+            updateSessionStatus(sessionId, 'confirmed', $button);
         }
     });
 
     $historyBlock.on('click', '.dnd-btn-reject', function() {
-        const sessionId = $(this).data('session-id');
+        const $button = $(this);
+        const sessionId = $button.data('session-id');
+        
         if (confirm('Bạn có chắc muốn từ chối buổi học này?')) {
-            updateSessionStatus(sessionId, 'cancelled');
+            // Disable button and show loading
+            $button.prop('disabled', true).text('Đang xử lý...');
+            updateSessionStatus(sessionId, 'cancelled', $button);
         }
     });
 
     $historyBlock.on('click', '.dnd-btn-cancel', function() {
-        const sessionId = $(this).data('session-id');
+        const $button = $(this);
+        const sessionId = $button.data('session-id');
+        
         if (confirm('Bạn có chắc muốn hủy buổi học này?')) {
-            updateSessionStatus(sessionId, 'cancelled');
+            // Disable button and show loading
+            $button.prop('disabled', true).text('Đang xử lý...');
+            updateSessionStatus(sessionId, 'cancelled', $button);
         }
     });
 
@@ -118,13 +130,17 @@ jQuery(document).ready(function($) {
     });
 
     $historyBlock.on('click', '.dnd-btn-end', function() {
-        const sessionId = $(this).data('session-id');
+        const $button = $(this);
+        const sessionId = $button.data('session-id');
+        
         if (confirm('Bạn có chắc muốn kết thúc buổi học này?')) {
-            updateSessionStatus(sessionId, 'completed');
+            // Disable button and show loading
+            $button.prop('disabled', true).text('Đang xử lý...');
+            updateSessionStatus(sessionId, 'completed', $button);
         }
     });
 
-    function updateSessionStatus(sessionId, newStatus) {
+    function updateSessionStatus(sessionId, newStatus, $button) {
         $.ajax({
             url: dnd_session_history_data.ajax_url,
             method: 'POST',
@@ -148,10 +164,34 @@ jQuery(document).ready(function($) {
                         loadSessionHistory(); // Reload after status update
                     }
                 } else {
-                    alert('Không thể cập nhật trạng thái buổi học. Vui lòng thử lại.');
+                    // Re-enable button on error
+                    if ($button) {
+                        $button.prop('disabled', false);
+                        // Restore original text based on status
+                        if (newStatus === 'cancelled') {
+                            $button.text('Hủy buổi học');
+                        } else if (newStatus === 'completed') {
+                            $button.text('Kết thúc');
+                        } else if (newStatus === 'confirmed') {
+                            $button.text('Xác nhận');
+                        }
+                    }
+                    alert(response.data && response.data.message ? response.data.message : 'Không thể cập nhật trạng thái buổi học. Vui lòng thử lại.');
                 }
             },
             error: function(xhr, status, error) {
+                // Re-enable button on error
+                if ($button) {
+                    $button.prop('disabled', false);
+                    // Restore original text based on status
+                    if (newStatus === 'cancelled') {
+                        $button.text('Hủy buổi học');
+                    } else if (newStatus === 'completed') {
+                        $button.text('Kết thúc');
+                    } else if (newStatus === 'confirmed') {
+                        $button.text('Xác nhận');
+                    }
+                }
                 console.error('Error updating session status:', xhr.responseText, status, error);
                 alert('Có lỗi xảy ra khi cập nhật trạng thái buổi học.');
             }

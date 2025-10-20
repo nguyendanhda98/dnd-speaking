@@ -32,6 +32,9 @@ jQuery(document).ready(function($) {
             return;
         }
 
+        // Disable toggle to prevent spam clicks
+        $toggle.prop('disabled', true);
+
         // Show loading message when going online or offline
         if (isAvailable) {
             $discordMessage.html('<span style="color: #0066cc;">⏳ Đang tạo phòng học...</span>');
@@ -51,6 +54,9 @@ jQuery(document).ready(function($) {
                 nonce: dnd_teacher_data.nonce
             },
             success: function(response) {
+                // Re-enable toggle
+                $toggle.prop('disabled', false);
+                
                 if (response.success) {
                     if (response.data.invite_link) {
                         // Room created successfully
@@ -97,6 +103,9 @@ jQuery(document).ready(function($) {
                 }
             },
             error: function(xhr, status, error) {
+                // Re-enable toggle
+                $toggle.prop('disabled', false);
+                
                 console.error('Error updating availability:', error);
                 $discordMessage.html('<span style="color: #cc0000;">✗ Có lỗi xảy ra. Vui lòng thử lại.</span>');
                 $discordMessage.show();

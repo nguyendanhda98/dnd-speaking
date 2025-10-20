@@ -14,6 +14,9 @@ jQuery(document).ready(function($) {
     $connectBtn.on('click', function(e) {
         e.preventDefault();
 
+        // Disable button to prevent spam
+        $connectBtn.prop('disabled', true);
+
         if ($(this).hasClass('dnd-btn-disconnect')) {
             disconnectDiscord();
         } else {
@@ -25,9 +28,11 @@ jQuery(document).ready(function($) {
         $status.html('<p>Đang kết nối với Discord...</p>');
 
         if (dnd_discord_data.discord_auth_url) {
-            // Redirect to Discord auth
+            // Redirect to Discord auth (no need to re-enable button since we're redirecting)
             window.location.href = dnd_discord_data.discord_auth_url;
         } else {
+            // Re-enable button on error
+            $connectBtn.prop('disabled', false);
             $status.html('<p>Lỗi: URL xác thực Discord chưa được cấu hình.</p>');
         }
     }
@@ -42,6 +47,9 @@ jQuery(document).ready(function($) {
                 'X-WP-Nonce': dnd_discord_data.nonce
             },
             success: function(response) {
+                // Re-enable button
+                $connectBtn.prop('disabled', false);
+                
                 if (response.success) {
                     $connectBtn.removeClass('dnd-btn-disconnect').addClass('dnd-btn-connect').text('Connect to Discord');
                     $status.html('<p>Đã ngắt kết nối Discord.</p>');
@@ -50,6 +58,9 @@ jQuery(document).ready(function($) {
                 }
             },
             error: function(xhr, status, error) {
+                // Re-enable button on error
+                $connectBtn.prop('disabled', false);
+                
                 console.error('Error disconnecting Discord:', xhr.responseText);
                 $status.html('<p>Lỗi khi ngắt kết nối Discord.</p>');
             }
