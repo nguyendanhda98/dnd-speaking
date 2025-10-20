@@ -437,7 +437,7 @@ class DND_Speaking_REST_API {
             if ($webhook_url && $room_id) {
                 error_log('STUDENT CANCEL IN_PROGRESS SESSION - Sending webhook to delete room: ' . $room_id);
                 
-                wp_remote_post($webhook_url, [
+                $webhook_response = wp_remote_post($webhook_url, [
                     'headers' => [
                         'Content-Type' => 'application/json'
                     ],
@@ -450,8 +450,30 @@ class DND_Speaking_REST_API {
                         'server_id' => get_option('dnd_discord_server_id')
                     ]),
                     'timeout' => 30,
-                    'blocking' => false
+                    'blocking' => true
                 ]);
+                
+                // Check webhook response
+                if (is_wp_error($webhook_response)) {
+                    error_log('STUDENT CANCEL - Webhook error: ' . $webhook_response->get_error_message());
+                    return new WP_Error('webhook_error', 'Không thể kết nối đến Discord server: ' . $webhook_response->get_error_message(), ['status' => 500]);
+                }
+                
+                $response_code = wp_remote_retrieve_response_code($webhook_response);
+                $response_body = json_decode(wp_remote_retrieve_body($webhook_response), true);
+                
+                if ($response_code !== 200) {
+                    error_log('STUDENT CANCEL - Webhook failed with code: ' . $response_code);
+                    return new WP_Error('webhook_failed', 'Discord server trả về lỗi (Code: ' . $response_code . ')', ['status' => 500]);
+                }
+                
+                if (!isset($response_body['success']) || !$response_body['success']) {
+                    $error_message = isset($response_body['message']) ? $response_body['message'] : 'Không thể xóa phòng học';
+                    error_log('STUDENT CANCEL - Webhook returned error: ' . $error_message);
+                    return new WP_Error('webhook_error', $error_message, ['status' => 500]);
+                }
+                
+                error_log('STUDENT CANCEL - Webhook successful, room deleted');
             }
 
             // Clean up teacher's room metadata
@@ -1127,7 +1149,7 @@ class DND_Speaking_REST_API {
             if ($webhook_url && $room_id) {
                 error_log('TEACHER CANCEL IN_PROGRESS SESSION - Sending webhook to delete room: ' . $room_id);
                 
-                wp_remote_post($webhook_url, [
+                $webhook_response = wp_remote_post($webhook_url, [
                     'headers' => [
                         'Content-Type' => 'application/json'
                     ],
@@ -1139,8 +1161,33 @@ class DND_Speaking_REST_API {
                         'server_id' => get_option('dnd_discord_server_id')
                     ]),
                     'timeout' => 30,
-                    'blocking' => false
+                    'blocking' => true
                 ]);
+                
+                // Check webhook response
+                if (is_wp_error($webhook_response)) {
+                    error_log('TEACHER CANCEL - Webhook error: ' . $webhook_response->get_error_message());
+                    wp_send_json_error('Không thể kết nối đến Discord server: ' . $webhook_response->get_error_message());
+                    return;
+                }
+                
+                $response_code = wp_remote_retrieve_response_code($webhook_response);
+                $response_body = json_decode(wp_remote_retrieve_body($webhook_response), true);
+                
+                if ($response_code !== 200) {
+                    error_log('TEACHER CANCEL - Webhook failed with code: ' . $response_code);
+                    wp_send_json_error('Discord server trả về lỗi (Code: ' . $response_code . ')');
+                    return;
+                }
+                
+                if (!isset($response_body['success']) || !$response_body['success']) {
+                    $error_message = isset($response_body['message']) ? $response_body['message'] : 'Không thể xóa phòng học';
+                    error_log('TEACHER CANCEL - Webhook returned error: ' . $error_message);
+                    wp_send_json_error($error_message);
+                    return;
+                }
+                
+                error_log('TEACHER CANCEL - Webhook successful, room deleted');
             }
 
             // Clean up teacher's room metadata
@@ -1159,7 +1206,7 @@ class DND_Speaking_REST_API {
             if ($webhook_url && $room_id) {
                 error_log('TEACHER COMPLETE IN_PROGRESS SESSION - Sending webhook to delete room: ' . $room_id);
                 
-                wp_remote_post($webhook_url, [
+                $webhook_response = wp_remote_post($webhook_url, [
                     'headers' => [
                         'Content-Type' => 'application/json'
                     ],
@@ -1171,8 +1218,33 @@ class DND_Speaking_REST_API {
                         'server_id' => get_option('dnd_discord_server_id')
                     ]),
                     'timeout' => 30,
-                    'blocking' => false
+                    'blocking' => true
                 ]);
+                
+                // Check webhook response
+                if (is_wp_error($webhook_response)) {
+                    error_log('TEACHER COMPLETE - Webhook error: ' . $webhook_response->get_error_message());
+                    wp_send_json_error('Không thể kết nối đến Discord server: ' . $webhook_response->get_error_message());
+                    return;
+                }
+                
+                $response_code = wp_remote_retrieve_response_code($webhook_response);
+                $response_body = json_decode(wp_remote_retrieve_body($webhook_response), true);
+                
+                if ($response_code !== 200) {
+                    error_log('TEACHER COMPLETE - Webhook failed with code: ' . $response_code);
+                    wp_send_json_error('Discord server trả về lỗi (Code: ' . $response_code . ')');
+                    return;
+                }
+                
+                if (!isset($response_body['success']) || !$response_body['success']) {
+                    $error_message = isset($response_body['message']) ? $response_body['message'] : 'Không thể xóa phòng học';
+                    error_log('TEACHER COMPLETE - Webhook returned error: ' . $error_message);
+                    wp_send_json_error($error_message);
+                    return;
+                }
+                
+                error_log('TEACHER COMPLETE - Webhook successful, room deleted');
             }
 
             // Clean up teacher's room metadata
