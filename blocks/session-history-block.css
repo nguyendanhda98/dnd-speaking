@@ -255,3 +255,22 @@
     padding: 40px;
     color: #6c757d;
 }
+
+.dnd-btn-join {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.dnd-btn-join:hover {
+    background: #218838;
+    color: white;
+    text-decoration: none;
+}

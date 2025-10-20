@@ -8,7 +8,6 @@ class DND_Speaking_REST_API {
 
     public function __construct() {
         add_action('rest_api_init', [$this, 'register_routes']);
-        add_action('wp_ajax_get_student_session_history', [$this, 'ajax_get_student_session_history']);
         add_action('wp_ajax_get_session_history', [$this, 'ajax_get_session_history']);
         add_action('wp_ajax_get_student_sessions', [$this, 'ajax_get_student_sessions']);
         add_action('wp_ajax_update_session_status', [$this, 'ajax_update_session_status']);
@@ -101,6 +100,13 @@ class DND_Speaking_REST_API {
             'permission_callback' => [$this, 'check_user_logged_in'],
         ]);
 
+        // Student start now endpoint
+        register_rest_route('dnd-speaking/v1', '/student/start-now', [
+            'methods' => 'POST',
+            'callback' => [$this, 'student_start_now'],
+            'permission_callback' => [$this, 'check_user_logged_in'],
+        ]);
+
         // Test endpoint
         register_rest_route('dnd-speaking/v1', '/test', [
             'methods' => 'GET',
@@ -111,157 +117,6 @@ class DND_Speaking_REST_API {
 
     public function check_user_logged_in() {
         return is_user_logged_in();
-    }
-
-    public function ajax_get_student_session_history() {
-        error_log('AJAX Student Session History - Handler called');
-        try {
-            // Debug logging
-            error_log('AJAX Student Session History - POST data: ' . print_r($_POST, true));
-            error_log('AJAX Student Session History - User logged in: ' . (is_user_logged_in() ? 'YES' : 'NO'));
-            error_log('AJAX Student Session History - User ID: ' . get_current_user_id());
-
-            // Verify nonce
-            if (!wp_verify_nonce($_POST['nonce'], 'student_session_history_nonce')) {
-                error_log('AJAX Student Session History - Nonce verification failed');
-                wp_send_json_error('Security check failed');
-                return;
-            }
-
-            // Check if user is logged in
-            if (!is_user_logged_in()) {
-                error_log('AJAX Student Session History - User not logged in');
-                wp_send_json_error('You must be logged in');
-                return;
-            }
-
-        $page = intval($_POST['page']) ?: 1;
-        $per_page = intval($_POST['per_page']) ?: 10;
-        $status_filter = sanitize_text_field($_POST['status_filter']) ?: 'all';
-
-        $allowed_per_page = [1, 3, 5, 10];
-        if (!in_array($per_page, $allowed_per_page)) {
-            $per_page = 10;
-        }
-
-        $allowed_filters = ['all', 'completed', 'cancelled'];
-        if (!in_array($status_filter, $allowed_filters)) {
-            $status_filter = 'all';
-        }
-
-        $offset = ($page - 1) * $per_page;
-        $user_id = get_current_user_id();
-
-        // Build WHERE clause based on filter
-        $where_clause = "s.student_id = %d";
-        $query_params = [$user_id];
-
-        if ($status_filter !== 'all') {
-            $where_clause .= " AND s.status = %s";
-            $query_params[] = $status_filter;
-        } else {
-            $where_clause .= " AND s.status IN ('completed', 'cancelled')";
-        }
-
-        global $wpdb;
-        $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
-
-        $sessions = $wpdb->get_results($wpdb->prepare(
-            "SELECT s.*, u.display_name as teacher_name
-             FROM $sessions_table s
-             LEFT JOIN {$wpdb->users} u ON s.teacher_id = u.ID
-             WHERE $where_clause
-             ORDER BY s.start_time DESC
-             LIMIT %d OFFSET %d",
-            array_merge($query_params, [$per_page, $offset])
-        ));
-
-        error_log('AJAX Student Session History - SQL Query: ' . $wpdb->last_query);
-        error_log('AJAX Student Session History - Sessions found: ' . count($sessions));
-
-        // Get total count for pagination
-        $total_sessions = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM $sessions_table s WHERE $where_clause",
-            $query_params
-        ));
-
-        $total_pages = ceil($total_sessions / $per_page);
-
-        // Generate HTML for sessions
-        $output = '';
-        if (empty($sessions)) {
-            $output .= '<div class="dnd-no-history">No session history available</div>';
-        } else {
-            $output .= '<div class="dnd-history-list">';
-            foreach ($sessions as $session) {
-                $session_datetime = $session->session_date . ' ' . $session->session_time;
-                $formatted_date = date('M j, Y', strtotime($session->session_date));
-                $formatted_time = date('g:i A', strtotime($session->session_time));
-
-                $status_class = $session->status === 'completed' ? 'completed' : 'cancelled';
-                $status_text = $session->status === 'completed' ? 'Completed' : 'Cancelled';
-
-                $duration = isset($session->duration) ? $session->duration . ' min' : 'N/A';
-
-                $output .= '<div class="dnd-history-item ' . $status_class . '">';
-                $output .= '<div class="dnd-history-header">';
-                $output .= '<div class="dnd-teacher-name">' . esc_html($session->teacher_name) . '</div>';
-                $output .= '<div class="dnd-session-status ' . $status_class . '">' . $status_text . '</div>';
-                $output .= '</div>';
-
-                $output .= '<div class="dnd-history-details">';
-                $output .= '<div class="dnd-session-datetime">' . $formatted_date . ' at ' . $formatted_time . '</div>';
-                $output .= '<div class="dnd-session-duration">Duration: ' . $duration . '</div>';
-
-                if ($session->status === 'cancelled') {
-                    $output .= '<div class="dnd-session-cancellation">Session was cancelled</div>';
-                }
-
-                $output .= '</div>';
-
-                if ($session->status === 'completed' && !empty($session->feedback)) {
-                    $output .= '<div class="dnd-session-feedback">';
-                    $output .= '<strong>Feedback:</strong> ' . esc_html($session->feedback);
-                    $output .= '</div>';
-                }
-
-                $output .= '</div>';
-            }
-            $output .= '</div>';
-
-            // Pagination
-            if ($total_pages > 1) {
-                $filter_param = $status_filter !== 'all' ? '&student_status_filter=' . $status_filter : '';
-                $per_page_param = '&student_per_page=' . $per_page;
-                $output .= '<div class="dnd-pagination">';
-                if ($page > 1) {
-                    $output .= '<a href="#" data-page="' . ($page - 1) . '" class="dnd-page-link">Previous</a>';
-                }
-
-                for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++) {
-                    $active_class = ($i === $page) ? ' active' : '';
-                    $output .= '<a href="#" data-page="' . $i . '" class="dnd-page-link' . $active_class . '">' . $i . '</a>';
-                }
-
-                if ($page < $total_pages) {
-                    $output .= '<a href="#" data-page="' . ($page + 1) . '" class="dnd-page-link">Next</a>';
-                }
-                $output .= '</div>';
-            }
-        }
-
-        wp_send_json([
-            'success' => true,
-            'html' => $output,
-            'pagination' => [
-                'current_page' => $page,
-                'total_pages' => $total_pages,
-                'total_sessions' => $total_sessions
-            ]
-        ]);
-        } catch (Exception $e) {
-            wp_send_json_error('An error occurred: ' . $e->getMessage());
-        }
     }
 
     public function ajax_get_session_history() {
@@ -394,6 +249,10 @@ class DND_Speaking_REST_API {
                             $output .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy buổi học</button>';
                             break;
                         case 'in_progress':
+                            // Add join button if discord_channel exists
+                            if (!empty($session->discord_channel)) {
+                                $output .= '<a href="' . esc_url($session->discord_channel) . '" class="dnd-btn dnd-btn-join" target="_blank">Tham gia ngay</a>';
+                            }
                             $output .= '<button class="dnd-btn dnd-btn-end" data-session-id="' . $session->id . '">Kết thúc</button>';
                             $output .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy buổi học</button>';
                             break;
@@ -467,11 +326,13 @@ class DND_Speaking_REST_API {
 
         $teachers = [];
         foreach ($users as $user) {
-            $available = get_user_meta($user->ID, 'dnd_available', true) == '1';
+            $available_status = get_user_meta($user->ID, 'dnd_available', true);
+            // Return status: '1' = online, 'busy' = busy, '' or other = offline
             $teachers[] = [
                 'id' => $user->ID,
                 'name' => $user->display_name,
-                'available' => $available,
+                'available' => $available_status === '1',
+                'status' => $available_status, // Return raw status for frontend display
             ];
         }
 
@@ -552,12 +413,55 @@ class DND_Speaking_REST_API {
 
         // Check if session belongs to user and is cancellable
         $session = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM $table WHERE id = %d AND student_id = %d AND status IN ('pending', 'confirmed')",
+            "SELECT * FROM $table WHERE id = %d AND student_id = %d AND status IN ('pending', 'confirmed', 'in_progress')",
             $session_id, $user_id
         ));
 
         if (!$session) {
             return new WP_Error('not_found', 'Session not found or not cancellable', ['status' => 404]);
+        }
+
+        $teacher_id = $session->teacher_id;
+        $has_room_link = !empty($session->discord_channel);
+
+        // If session is in_progress with room link, send webhook to clean up Discord room
+        if ($session->status === 'in_progress' && $has_room_link) {
+            $webhook_url = get_option('dnd_discord_webhook');
+            
+            // Extract room_id from discord_channel URL
+            $room_id = '';
+            if (preg_match('/channels\/\d+\/(\d+)/', $session->discord_channel, $matches)) {
+                $room_id = $matches[1];
+            }
+            
+            if ($webhook_url && $room_id) {
+                error_log('STUDENT CANCEL IN_PROGRESS SESSION - Sending webhook to delete room: ' . $room_id);
+                
+                wp_remote_post($webhook_url, [
+                    'headers' => [
+                        'Content-Type' => 'application/json'
+                    ],
+                    'body' => json_encode([
+                        'action' => 'student_cancel_session',
+                        'teacher_wp_id' => $teacher_id,
+                        'student_wp_id' => $user_id,
+                        'session_id' => $session_id,
+                        'room_id' => $room_id,
+                        'server_id' => get_option('dnd_discord_server_id')
+                    ]),
+                    'timeout' => 30,
+                    'blocking' => false
+                ]);
+            }
+
+            // Clean up teacher's room metadata
+            delete_user_meta($teacher_id, 'discord_voice_channel_id');
+            delete_user_meta($teacher_id, 'discord_voice_channel_invite');
+            
+            // Reset teacher status to offline (not available)
+            update_user_meta($teacher_id, 'dnd_available', '0');
+            
+            error_log('STUDENT CANCEL IN_PROGRESS SESSION - Cleaned up room metadata and set status to offline for teacher: ' . $teacher_id);
         }
 
         // Update status to cancelled
@@ -850,7 +754,7 @@ class DND_Speaking_REST_API {
             $where_clause .= " AND s.status = %s";
             $query_params[] = $status_filter;
         } else {
-            $where_clause .= " AND s.status IN ('completed', 'cancelled')";
+            $where_clause .= " AND s.status IN ('in_progress', 'completed', 'cancelled')";
         }
 
         global $wpdb;
@@ -901,16 +805,59 @@ class DND_Speaking_REST_API {
         // Generate HTML for sessions
         $output = '';
         if (empty($sessions)) {
+            // Create a test in_progress session for debugging
+            $test_session_id = $wpdb->get_var("SELECT id FROM {$wpdb->prefix}dnd_speaking_sessions WHERE status = 'in_progress' LIMIT 1");
+            if (!$test_session_id) {
+                error_log('TEACHER SESSION HISTORY - No in_progress sessions found, creating test session');
+                $wpdb->insert(
+                    $wpdb->prefix . 'dnd_speaking_sessions',
+                    [
+                        'student_id' => 1, // Test student
+                        'teacher_id' => $user_id,
+                        'session_date' => current_time('Y-m-d'),
+                        'session_time' => current_time('H:i:s'),
+                        'start_time' => current_time('mysql'),
+                        'status' => 'in_progress',
+                        'discord_channel' => 'https://discord.com/channels/123456789/987654321',
+                        'created_at' => current_time('mysql')
+                    ]
+                );
+                error_log('TEACHER SESSION HISTORY - Test session created with ID: ' . $wpdb->insert_id);
+            }
+            
             $output .= '<div class="dnd-no-history">No session history available</div>';
         } else {
             $output .= '<div class="dnd-history-list">';
             foreach ($sessions as $session) {
+                // Debug logging for in_progress sessions
+                if ($session->status === 'in_progress') {
+                    error_log('TEACHER SESSION HISTORY - Found in_progress session: ID=' . $session->id . ', discord_channel=' . ($session->discord_channel ?: 'NULL'));
+                }
+                
                 $session_datetime = $session->session_date . ' ' . $session->session_time;
                 $formatted_date = date('M j, Y', strtotime($session->session_date));
                 $formatted_time = date('g:i A', strtotime($session->session_time));
 
-                $status_class = $session->status === 'completed' ? 'completed' : 'cancelled';
-                $status_text = $session->status === 'completed' ? 'Completed' : 'Cancelled';
+                // Status mapping
+                $status_class = '';
+                $status_text = '';
+                switch ($session->status) {
+                    case 'in_progress':
+                        $status_class = 'in_progress';
+                        $status_text = 'Đang diễn ra';
+                        break;
+                    case 'completed':
+                        $status_class = 'completed';
+                        $status_text = 'Completed';
+                        break;
+                    case 'cancelled':
+                        $status_class = 'cancelled';
+                        $status_text = 'Cancelled';
+                        break;
+                    default:
+                        $status_class = $session->status;
+                        $status_text = ucfirst($session->status);
+                }
 
                 $duration = isset($session->duration) ? $session->duration . ' min' : 'N/A';
 
@@ -923,6 +870,14 @@ class DND_Speaking_REST_API {
                 $output .= '<div class="dnd-history-details">';
                 $output .= '<div class="dnd-session-datetime">' . $formatted_date . ' at ' . $formatted_time . '</div>';
                 $output .= '<div class="dnd-session-duration">Duration: ' . $duration . '</div>';
+
+                // Show join button for in_progress sessions
+                if ($session->status === 'in_progress' && !empty($session->discord_channel)) {
+                    error_log('TEACHER SESSION HISTORY - Adding join button for session ID=' . $session->id);
+                    $output .= '<div class="dnd-session-actions">';
+                    $output .= '<a href="' . esc_url($session->discord_channel) . '" class="dnd-btn dnd-btn-join" target="_blank">Tham gia ngay</a>';
+                    $output .= '</div>';
+                }
 
                 if ($session->status === 'cancelled' && isset($cancelled_by_names[$session->id])) {
                     $cancel_info = $cancelled_by_names[$session->id];
@@ -1158,6 +1113,79 @@ class DND_Speaking_REST_API {
             wp_send_json_error('Session not found or access denied');
         }
 
+        $room_cleared = false;
+        $webhook_url = get_option('dnd_discord_webhook');
+        
+        // Extract room_id from discord_channel URL if exists
+        $room_id = '';
+        if (!empty($session->discord_channel) && preg_match('/channels\/\d+\/(\d+)/', $session->discord_channel, $matches)) {
+            $room_id = $matches[1];
+        }
+
+        // Case 1: Cancelling an in_progress session with a room
+        if ($new_status === 'cancelled' && $session->status === 'in_progress' && !empty($session->discord_channel)) {
+            if ($webhook_url && $room_id) {
+                error_log('TEACHER CANCEL IN_PROGRESS SESSION - Sending webhook to delete room: ' . $room_id);
+                
+                wp_remote_post($webhook_url, [
+                    'headers' => [
+                        'Content-Type' => 'application/json'
+                    ],
+                    'body' => json_encode([
+                        'action' => 'teacher_cancel_session',
+                        'teacher_wp_id' => $user_id,
+                        'session_id' => $session_id,
+                        'room_id' => $room_id,
+                        'server_id' => get_option('dnd_discord_server_id')
+                    ]),
+                    'timeout' => 30,
+                    'blocking' => false
+                ]);
+            }
+
+            // Clean up teacher's room metadata
+            delete_user_meta($user_id, 'discord_voice_channel_id');
+            delete_user_meta($user_id, 'discord_voice_channel_invite');
+            
+            // Reset teacher status to offline (not available)
+            update_user_meta($user_id, 'dnd_available', '0');
+            
+            $room_cleared = true;
+            error_log('TEACHER CANCEL IN_PROGRESS SESSION - Cleaned up room metadata and set status to offline for teacher: ' . $user_id);
+        }
+        
+        // Case 2: Completing an in_progress session with a room
+        if ($new_status === 'completed' && $session->status === 'in_progress' && !empty($session->discord_channel)) {
+            if ($webhook_url && $room_id) {
+                error_log('TEACHER COMPLETE IN_PROGRESS SESSION - Sending webhook to delete room: ' . $room_id);
+                
+                wp_remote_post($webhook_url, [
+                    'headers' => [
+                        'Content-Type' => 'application/json'
+                    ],
+                    'body' => json_encode([
+                        'action' => 'teacher_complete_session',
+                        'teacher_wp_id' => $user_id,
+                        'session_id' => $session_id,
+                        'room_id' => $room_id,
+                        'server_id' => get_option('dnd_discord_server_id')
+                    ]),
+                    'timeout' => 30,
+                    'blocking' => false
+                ]);
+            }
+
+            // Clean up teacher's room metadata
+            delete_user_meta($user_id, 'discord_voice_channel_id');
+            delete_user_meta($user_id, 'discord_voice_channel_invite');
+            
+            // Reset teacher status to offline (not available)
+            update_user_meta($user_id, 'dnd_available', '0');
+            
+            $room_cleared = true;
+            error_log('TEACHER COMPLETE IN_PROGRESS SESSION - Cleaned up room metadata and set status to offline for teacher: ' . $user_id);
+        }
+
         // Update the session status
         $result = $wpdb->update(
             $sessions_table,
@@ -1168,7 +1196,10 @@ class DND_Speaking_REST_API {
         );
 
         if ($result !== false) {
-            wp_send_json_success('Session status updated successfully');
+            wp_send_json_success([
+                'message' => 'Session status updated successfully',
+                'room_cleared' => $room_cleared
+            ]);
         } else {
             wp_send_json_error('Failed to update session status');
         }
@@ -1221,6 +1252,14 @@ class DND_Speaking_REST_API {
              LIMIT %d OFFSET %d",
             array_merge($query_params, [$per_page, $offset])
         ));
+        
+        error_log('=== STUDENT SESSIONS DEBUG ===');
+        error_log('SQL Query: ' . $wpdb->last_query);
+        error_log('Sessions found: ' . count($sessions));
+        error_log('Filter: ' . $filter . ', User ID: ' . $user_id);
+        if (!empty($sessions)) {
+            error_log('First session: ' . print_r($sessions[0], true));
+        }
 
         // Get total count for pagination
         $total_sessions = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $sessions_table s WHERE $where_clause", $query_params));
@@ -1276,20 +1315,25 @@ class DND_Speaking_REST_API {
             case 'confirmed':
                 $status_text = 'Đã xác nhận';
                 $status_class = 'confirmed';
-                $actions = '';
-                // Check if within 15 minutes before start
-                if (!empty($session->session_date) && !empty($session->session_time)) {
-                    $session_datetime = strtotime($session->session_date . ' ' . $session->session_time);
-                    if (time() >= ($session_datetime - 15 * 60) && time() < $session_datetime) {
-                        $actions .= '<button class="dnd-btn dnd-btn-join" data-session-id="' . $session->id . '">Tham gia ngay</button>';
-                    }
+                
+                // Show join button with room link if available
+                if (!empty($session->discord_channel)) {
+                    $actions = '<a href="' . esc_url($session->discord_channel) . '" class="dnd-btn dnd-btn-join">Tham gia ngay</a>';
+                } else {
+                    $actions = '';
                 }
                 $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
                 break;
             case 'in_progress':
                 $status_text = 'Đang diễn ra';
                 $status_class = 'in_progress';
-                $actions = '<button class="dnd-btn dnd-btn-join" data-session-id="' . $session->id . '">Tham gia ngay</button>';
+                
+                // Show join button with room link if available
+                if (!empty($session->discord_channel)) {
+                    $actions = '<a href="' . esc_url($session->discord_channel) . '" class="dnd-btn dnd-btn-join">Tham gia ngay</a>';
+                } else {
+                    $actions = '';
+                }
                 $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
                 break;
             case 'completed':
@@ -1311,11 +1355,15 @@ class DND_Speaking_REST_API {
             $scheduled_time = date('d/m/Y H:i', strtotime($session->session_date . ' ' . $session->session_time));
         }
 
+        // Don't show room link text, only button will have the link
+        $room_link_html = '';
+
         return '
             <div class="dnd-session-card" data-session-id="' . $session->id . '">
                 <div class="dnd-session-teacher">Giáo viên: ' . esc_html($session->teacher_name ?: 'N/A') . '</div>
                 <div class="dnd-session-status ' . $status_class . '">Trạng thái: ' . $status_text . '</div>
                 <div class="dnd-session-time">Thời gian: ' . $scheduled_time . '</div>
+                ' . $room_link_html . '
                 <div class="dnd-session-actions">' . $actions . '</div>
             </div>
         ';
@@ -1434,6 +1482,14 @@ class DND_Speaking_REST_API {
             error_log('[DND Discord] get_discord_auth_url called by user_id=' . get_current_user_id());
         }
         
+        // Use the generated URL from settings if available
+        $generated_url = get_option('dnd_discord_generated_url');
+        if ($generated_url) {
+            // The generated URL already includes state, so just return it
+            return ['auth_url' => $generated_url];
+        }
+        
+        // Fallback to generating URL if not configured
         $client_id = get_option('dnd_discord_client_id');
         $redirect_page = get_option('dnd_discord_redirect_page_full') ?: get_option('dnd_discord_redirect_page') ?: get_site_url();
         $redirect_uri = $redirect_page ?: get_site_url();
@@ -1466,7 +1522,7 @@ class DND_Speaking_REST_API {
             'state' => $state
         ]);
 
-        return ['url' => $auth_url];
+        return ['auth_url' => $auth_url];
     }
 
     /*
@@ -1876,4 +1932,159 @@ class DND_Speaking_REST_API {
 
         return $discord_info;
     }
+
+    /**
+     * Student Start Now - Request to join a speaking session immediately
+     */
+    public function student_start_now($request) {
+        global $wpdb;
+        
+        $user_id = get_current_user_id();
+        $teacher_id = intval($request->get_param('teacher_id'));
+        
+        if (!$teacher_id) {
+            return new WP_Error('missing_teacher_id', 'Teacher ID is required', ['status' => 400]);
+        }
+        
+        // Check if teacher is actually available (not offline or busy)
+        $teacher_available = get_user_meta($teacher_id, 'dnd_available', true);
+        if ($teacher_available !== '1') {
+            return new WP_REST_Response([
+                'success' => false,
+                'teacher_not_available' => true,
+                'message' => 'Xin lỗi, giáo viên hiện đang bận hoặc offline. Vui lòng thử lại sau.'
+            ], 200);
+        }
+        
+        // Check if student has connected Discord
+        $discord_connected = get_user_meta($user_id, 'discord_connected', true);
+        if (!$discord_connected) {
+            $auth_url_response = $this->get_discord_auth_url($request);
+            $auth_url = '';
+            
+            if (!is_wp_error($auth_url_response) && isset($auth_url_response['auth_url'])) {
+                $auth_url = $auth_url_response['auth_url'];
+            }
+            
+            return new WP_REST_Response([
+                'success' => false,
+                'need_discord_connection' => true,
+                'message' => 'Bạn cần liên kết tài khoản Discord để bắt đầu phiên học.',
+                'discord_auth_url' => $auth_url
+            ], 200);
+        }
+        
+        // Check if student already has an active session
+        $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
+        $active_session = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $sessions_table WHERE student_id = %d AND status = 'confirmed' AND end_time IS NULL",
+            $user_id
+        ));
+        
+        if ($active_session) {
+            return new WP_REST_Response([
+                'success' => false,
+                'has_active_session' => true,
+                'session_id' => $active_session->id,
+                'room_link' => $active_session->discord_channel,
+                'message' => 'Bạn đang có một phiên học đang hoạt động. Bạn có muốn tiếp tục với phiên học này không?'
+            ], 200);
+        }
+        
+        // Get teacher's room ID (Discord channel ID)
+        $teacher_channel_id = get_user_meta($teacher_id, 'discord_voice_channel_id', true);
+        if (!$teacher_channel_id) {
+            return new WP_Error('teacher_no_room', 'Giáo viên chưa có phòng học', ['status' => 400]);
+        }
+        
+        // Send webhook to get room assignment
+        $webhook_url = get_option('dnd_discord_webhook');
+        if (!$webhook_url) {
+            return new WP_Error('webhook_not_configured', 'Webhook chưa được cấu hình', ['status' => 500]);
+        }
+        
+        $student_discord_id = get_user_meta($user_id, 'discord_user_id', true);
+        $student_discord_name = get_user_meta($user_id, 'discord_global_name', true);
+        
+        $webhook_response = wp_remote_post($webhook_url, [
+            'headers' => [
+                'Content-Type' => 'application/json'
+            ],
+            'body' => json_encode([
+                'action' => 'student_start_now',
+                'student_discord_id' => $student_discord_id,
+                'student_discord_name' => $student_discord_name,
+                'student_wp_id' => $user_id,
+                'teacher_wp_id' => $teacher_id,
+                'teacher_room_id' => $teacher_channel_id,
+                'server_id' => get_option('dnd_discord_server_id')
+            ]),
+            'timeout' => 30
+        ]);
+        
+        if (is_wp_error($webhook_response)) {
+            return new WP_Error('webhook_error', 'Không thể kết nối đến server Discord: ' . $webhook_response->get_error_message(), ['status' => 500]);
+        }
+        
+        $response_code = wp_remote_retrieve_response_code($webhook_response);
+        if ($response_code !== 200) {
+            return new WP_Error('webhook_failed', 'Server Discord trả về lỗi (Code: ' . $response_code . ')', ['status' => 500]);
+        }
+        
+        $body = json_decode(wp_remote_retrieve_body($webhook_response), true);
+        
+        if (!isset($body['success']) || !$body['success']) {
+            $error_message = isset($body['message']) ? $body['message'] : 'Không thể tạo phòng học';
+            return new WP_Error('room_creation_failed', $error_message, ['status' => 500]);
+        }
+        
+        // Get room link from webhook response
+        $room_id = isset($body['room_id']) ? $body['room_id'] : $teacher_channel_id;
+        $room_link = isset($body['room_link']) ? $body['room_link'] : '';
+        
+        // If no room link provided, construct it from room_id
+        if (!$room_link && $room_id) {
+            // Discord channel links format: https://discord.com/channels/SERVER_ID/CHANNEL_ID
+            $server_id = get_option('dnd_discord_server_id');
+            $room_link = "https://discord.com/channels/{$server_id}/{$room_id}";
+        }
+        
+        // Create confirmed session
+        $insert_result = $wpdb->insert(
+            $sessions_table,
+            [
+                'student_id' => $user_id,
+                'teacher_id' => $teacher_id,
+                'session_date' => current_time('Y-m-d'),
+                'session_time' => current_time('H:i:s'),
+                'start_time' => current_time('mysql'),
+                'status' => 'in_progress',
+                'discord_channel' => $room_link,
+                'created_at' => current_time('mysql')
+            ],
+            ['%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s']
+        );
+        
+        if ($insert_result === false) {
+            error_log('Failed to insert session. Error: ' . $wpdb->last_error);
+            error_log('SQL Query: ' . $wpdb->last_query);
+            return new WP_Error('db_insert_failed', 'Không thể tạo session trong database', ['status' => 500]);
+        }
+        
+        $session_id = $wpdb->insert_id;
+        
+        // Set teacher status to busy
+        update_user_meta($teacher_id, 'dnd_available', 'busy');
+        
+        error_log('Session created successfully. ID: ' . $session_id . ', Student: ' . $user_id . ', Teacher: ' . $teacher_id . ', Room Link: ' . $room_link);
+        error_log('Teacher ' . $teacher_id . ' status set to busy');
+        
+        return new WP_REST_Response([
+            'success' => true,
+            'session_id' => $session_id,
+            'room_link' => $room_link,
+            'message' => 'Phiên học đã được tạo thành công!'
+        ], 200);
+    }
 }
+

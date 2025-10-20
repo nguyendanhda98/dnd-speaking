@@ -5,6 +5,17 @@ jQuery(document).ready(function($) {
 
     if ($toggle.length === 0) return;
 
+    // Check if toggle is disabled (teacher is busy)
+    if ($toggle.prop('disabled')) {
+        // Prevent any interaction when teacher is busy
+        $toggle.on('click', function(e) {
+            e.preventDefault();
+            alert('Bạn đang trong buổi học. Vui lòng hoàn thành hoặc hủy buổi học hiện tại trước khi thay đổi trạng thái.');
+            return false;
+        });
+        return; // Don't attach other event handlers
+    }
+
     // Handle availability toggle
     $toggle.on('change', function() {
         const isAvailable = $(this).is(':checked');
@@ -21,12 +32,13 @@ jQuery(document).ready(function($) {
             return;
         }
 
-        // Show loading message when going online
+        // Show loading message when going online or offline
         if (isAvailable) {
             $discordMessage.html('<span style="color: #0066cc;">⏳ Đang tạo phòng học...</span>');
             $discordMessage.show();
         } else {
-            $discordMessage.hide();
+            $discordMessage.html('<span style="color: #0066cc;">⏳ Đang xóa phòng...</span>');
+            $discordMessage.show();
         }
 
         $.ajax({
@@ -49,9 +61,13 @@ jQuery(document).ready(function($) {
                             $discordMessage.fadeOut();
                         }, 3000);
                     } else {
-                        // When going offline, reset link
+                        // When going offline, reset link and show success message
                         $roomLink.attr('href', '#').text('Link room');
-                        $discordMessage.hide();
+                        $discordMessage.html('<span style="color: #00aa00;">✓ Xóa phòng thành công!</span>');
+                        // Hide success message after 3 seconds
+                        setTimeout(function() {
+                            $discordMessage.fadeOut();
+                        }, 3000);
                     }
                     console.log('Availability updated successfully');
                 } else {

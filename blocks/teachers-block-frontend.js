@@ -39,11 +39,26 @@ jQuery(document).ready(function($) {
     });
 
     function renderTeachers(teachers) {
-        const html = teachers.map(teacher => `
+        const html = teachers.map(teacher => {
+            let statusText = 'Offline';
+            let statusClass = '';
+            let showStartNow = false;
+            
+            if (teacher.status === '1') {
+                statusText = 'Online';
+                statusClass = 'online';
+                showStartNow = true;
+            } else if (teacher.status === 'busy') {
+                statusText = 'Busy';
+                statusClass = 'busy';
+                showStartNow = false;
+            }
+            
+            return `
             <div class="dnd-teacher-card">
                 <div class="dnd-teacher-name">${teacher.name}</div>
-                <div class="dnd-teacher-status ${teacher.available ? 'online' : ''}">
-                    ${teacher.available ? 'Online' : 'Offline'}
+                <div class="dnd-teacher-status ${statusClass}">
+                    ${statusText}
                 </div>
                 <div class="dnd-teacher-buttons">
                     <button class="dnd-btn dnd-btn-book" type="button" data-teacher-id="${teacher.id}">
@@ -52,7 +67,7 @@ jQuery(document).ready(function($) {
                         </svg>
                         Book Now
                     </button>
-                    ${teacher.available ? `
+                    ${showStartNow ? `
                         <button class="dnd-btn dnd-btn-start" type="button" data-teacher-id="${teacher.id}">
                             <svg class="dnd-btn-icon" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
@@ -62,7 +77,8 @@ jQuery(document).ready(function($) {
                     ` : ''}
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         $teachersList.html(html);
 
@@ -93,7 +109,61 @@ jQuery(document).ready(function($) {
 
         $('.dnd-btn-start').on('click', function() {
             const teacherId = $(this).data('teacher-id');
-            startSession(teacherId);
+            const teacherName = $(this).closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
+            startNowSession(teacherId, teacherName);
+        });
+    }
+
+    function startNowSession(teacherId, teacherName) {
+        // Show confirmation dialog
+        if (!confirm(`Bạn có muốn bắt đầu phiên học với ${teacherName} ngay bây giờ không?`)) {
+            return;
+        }
+
+        // Show loading state
+        const $loadingModal = $('<div id="dnd-loading-modal" class="dnd-booking-modal show"><div class="dnd-modal-content"><p>Đang kết nối...</p></div></div>');
+        $('body').append($loadingModal);
+
+        $.ajax({
+            url: dnd_speaking_data.rest_url + 'student/start-now',
+            method: 'POST',
+            headers: {
+                'X-WP-Nonce': dnd_speaking_data.nonce
+            },
+            data: {
+                teacher_id: teacherId
+            },
+            success: function(response) {
+                $loadingModal.remove();
+                
+                if (response.success) {
+                    // Successfully created session, redirect directly to Discord room
+                    window.location.href = response.room_link;
+                } else if (response.teacher_not_available) {
+                    // Teacher is offline or busy
+                    alert(response.message);
+                } else if (response.need_discord_connection) {
+                    // Need to connect Discord first
+                    if (confirm(response.message + '\n\nBạn có muốn kết nối Discord ngay bây giờ không?')) {
+                        window.location.href = response.discord_auth_url;
+                    }
+                } else if (response.has_active_session) {
+                    // Already has an active session
+                    if (confirm(response.message)) {
+                        // Redirect to existing room
+                        window.location.href = response.room_link;
+                    }
+                } else {
+                    alert(response.message || 'Có lỗi xảy ra, vui lòng thử lại.');
+                }
+            },
+            error: function(xhr) {
+                $loadingModal.remove();
+                const errorMessage = xhr.responseJSON && xhr.responseJSON.message 
+                    ? xhr.responseJSON.message 
+                    : 'Có lỗi xảy ra khi tạo phiên học.';
+                alert(errorMessage);
+            }
         });
     }
 

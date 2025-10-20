@@ -296,7 +296,7 @@ class DND_Speaking_Admin {
                     if ($active_sub_tab == 'app_details') {
                         ?>
                         <!-- Hidden fields to preserve webhook settings -->
-                        <input type="hidden" name="dnd_teacher_status_webhook" value="<?php echo esc_attr(get_option('dnd_teacher_status_webhook')); ?>" />
+                        <input type="hidden" name="dnd_discord_webhook" value="<?php echo esc_attr(get_option('dnd_discord_webhook')); ?>" />
                         
                         <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px; margin-top: 10px;">
                             <label for="dnd_discord_client_id" style="width: 150px; font-weight: bold;">Client ID</label>
@@ -360,10 +360,10 @@ class DND_Speaking_Admin {
                         <input type="hidden" name="dnd_discord_connect_to_bot" value="<?php echo esc_attr(get_option('dnd_discord_connect_to_bot')); ?>" />
                         
                         <div class="form-field" style="display: flex; align-items: center; margin-bottom: 10px; margin-top: 10px;">
-                            <label for="dnd_teacher_status_webhook" style="width: 150px; font-weight: bold;">Teacher Status Webhook</label>
-                            <input type="url" id="dnd_teacher_status_webhook" name="dnd_teacher_status_webhook" value="<?php echo esc_attr(get_option('dnd_teacher_status_webhook')); ?>" style="max-width: 300px;" />
+                            <label for="dnd_discord_webhook" style="width: 150px; font-weight: bold;">Discord Webhook URL</label>
+                            <input type="url" id="dnd_discord_webhook" name="dnd_discord_webhook" value="<?php echo esc_attr(get_option('dnd_discord_webhook')); ?>" style="max-width: 400px; width: 400px;" />
                         </div>
-                        <p class="description" style="margin-left: 160px; margin-top: -10px;">Webhook URL to send teacher status updates and receive room links</p>
+                        <p class="description" style="margin-left: 160px; margin-top: -10px;">Webhook URL for all Discord integrations. The system will send different 'action' values: 'online' (teacher goes online), 'offline' (teacher goes offline), 'student_start_now' (student starts a session).</p>
                         <?php
                     } elseif ($active_sub_tab == 'advanced') {
                         ?>
@@ -377,7 +377,7 @@ class DND_Speaking_Admin {
                         <input type="hidden" name="dnd_discord_bot_token" value="<?php echo esc_attr(get_option('dnd_discord_bot_token')); ?>" />
                         <input type="hidden" name="dnd_discord_server_id" value="<?php echo esc_attr(get_option('dnd_discord_server_id')); ?>" />
                         <input type="hidden" name="dnd_discord_connect_to_bot" value="<?php echo esc_attr(get_option('dnd_discord_connect_to_bot')); ?>" />
-                        <input type="hidden" name="dnd_teacher_status_webhook" value="<?php echo esc_attr(get_option('dnd_teacher_status_webhook')); ?>" />
+                        <input type="hidden" name="dnd_discord_webhook" value="<?php echo esc_attr(get_option('dnd_discord_webhook')); ?>" />
                         
                         <?php
                         echo '<p>Advanced settings will be added here.</p>';
@@ -475,7 +475,7 @@ class DND_Speaking_Admin {
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_server_id');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_connect_to_bot');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_generated_url');
-        register_setting('dnd_speaking_discord_settings', 'dnd_teacher_status_webhook');
+        register_setting('dnd_speaking_discord_settings', 'dnd_discord_webhook');
 
         add_settings_section(
             'dnd_speaking_discord_app_details',
@@ -765,7 +765,7 @@ class DND_Speaking_Admin {
             }
 
             // Send webhook to get room link
-            $webhook_url = get_option('dnd_teacher_status_webhook');
+            $webhook_url = get_option('dnd_discord_webhook');
             if (!$webhook_url) {
                 wp_send_json_error(['message' => 'Webhook URL chưa được cấu hình.']);
                 return;
@@ -777,10 +777,10 @@ class DND_Speaking_Admin {
                     'Content-Type' => 'application/json'
                 ],
                 'body' => json_encode([
+                    'action' => 'online',
                     'discord_user_id' => get_user_meta($user_id, 'discord_user_id', true),
                     'discord_global_name' => get_user_meta($user_id, 'discord_global_name', true),
-                    'server_id' => get_option('dnd_discord_server_id'),
-                    'action' => 'online'
+                    'server_id' => get_option('dnd_discord_server_id')
                 ]),
                 'timeout' => 30
             ]);
@@ -814,27 +814,39 @@ class DND_Speaking_Admin {
             }
         } else {
             // Send webhook for offline status
-            $webhook_url = get_option('dnd_teacher_status_webhook');
+            $webhook_url = get_option('dnd_discord_webhook');
             $channel_id = get_user_meta($user_id, 'discord_voice_channel_id', true);
             
             if ($webhook_url && $channel_id) {
                 $user = get_userdata($user_id);
-                wp_remote_post($webhook_url, [
+                $webhook_response = wp_remote_post($webhook_url, [
                     'headers' => [
                         'Content-Type' => 'application/json'
                     ],
                     'body' => json_encode([
+                        'action' => 'offline',
                         'discord_user_id' => get_user_meta($user_id, 'discord_user_id', true),
                         'discord_global_name' => get_user_meta($user_id, 'discord_global_name', true),
                         'server_id' => get_option('dnd_discord_server_id'),
-                        'channelId' => $channel_id,
-                        'action' => 'offline'
+                        'channelId' => $channel_id
                     ]),
                     'timeout' => 30
                 ]);
+                
+                // Wait for webhook response
+                if (is_wp_error($webhook_response)) {
+                    wp_send_json_error(['message' => 'Không thể kết nối đến server Discord để xóa phòng.']);
+                    return;
+                }
+                
+                $response_code = wp_remote_retrieve_response_code($webhook_response);
+                if ($response_code !== 200) {
+                    wp_send_json_error(['message' => 'Server Discord trả về lỗi khi xóa phòng (Code: ' . $response_code . ').']);
+                    return;
+                }
             }
 
-            // Clean up metadata
+            // Clean up metadata after successful webhook response
             if ($channel_id) {
                 // Clean up meta
                 delete_user_meta($user_id, 'discord_voice_channel_id');

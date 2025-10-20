@@ -208,12 +208,19 @@ class DND_Speaking_Student_Sessions_Block {
             case 'confirmed':
                 $status_text = 'Đã xác nhận';
                 $status_class = 'confirmed';
-                $actions = '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
-                // Check if within 15 minutes before start
+                
+                // Show join button with room link if available
+                if (!empty($session->discord_channel)) {
+                    $actions = '<a href="' . esc_url($session->discord_channel) . '" target="_blank" class="dnd-btn dnd-btn-join">Tham gia phòng</a>';
+                }
+                $actions .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy</button>';
+                
+                // Check if within 15 minutes before scheduled start time
                 if (!empty($session->session_date) && !empty($session->session_time)) {
                     $session_datetime = strtotime($session->session_date . ' ' . $session->session_time);
                     if (time() >= ($session_datetime - 15 * 60) && time() < $session_datetime) {
-                        $actions .= '<button class="dnd-btn dnd-btn-join" data-session-id="' . $session->id . '">Tham gia ngay</button>';
+                        // Add extra visual indication for joinable sessions
+                        $status_text = 'Sẵn sàng tham gia';
                     }
                 }
                 break;
@@ -236,11 +243,15 @@ class DND_Speaking_Student_Sessions_Block {
             $scheduled_time = date('d/m/Y H:i', strtotime($session->session_date . ' ' . $session->session_time));
         }
 
+        // Don't show room link text, only button will have the link
+        $room_link_html = '';
+
         return '
             <div class="dnd-session-card" data-session-id="' . $session->id . '">
                 <div class="dnd-session-teacher">Giáo viên: ' . esc_html($session->teacher_name ?: 'N/A') . '</div>
                 <div class="dnd-session-status ' . $status_class . '">Trạng thái: ' . $status_text . '</div>
                 <div class="dnd-session-time">Thời gian: ' . $scheduled_time . '</div>
+                ' . $room_link_html . '
                 <div class="dnd-session-actions">' . $actions . '</div>
             </div>
         ';

@@ -87,5 +87,17 @@ class DND_Speaking_Activator {
         if (!in_array('cancelled_at', $columns)) {
             $wpdb->query("ALTER TABLE $table_sessions ADD COLUMN cancelled_at datetime DEFAULT NULL");
         }
+
+        if (!in_array('discord_channel', $columns)) {
+            $wpdb->query("ALTER TABLE $table_sessions ADD COLUMN discord_channel varchar(255) DEFAULT NULL");
+        }
+
+        if (!in_array('created_at', $columns)) {
+            $wpdb->query("ALTER TABLE $table_sessions ADD COLUMN created_at datetime DEFAULT CURRENT_TIMESTAMP");
+        }
+
+        if (!in_array('feedback', $columns)) {
+            $wpdb->query("ALTER TABLE $table_sessions ADD COLUMN feedback text DEFAULT NULL");
+        }
     }
 }

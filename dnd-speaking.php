@@ -23,7 +23,6 @@ require_once plugin_dir_path(__FILE__) . 'blocks/feedback-block.php';
 
 // Autoload blocks
 require_once plugin_dir_path(__FILE__) . 'blocks/student-sessions-block.php';
-require_once plugin_dir_path(__FILE__) . 'blocks/student-session-history-block.php';
 require_once plugin_dir_path(__FILE__) . 'blocks/discord-connect-block.php';
 
 // Activation / deactivation hooks

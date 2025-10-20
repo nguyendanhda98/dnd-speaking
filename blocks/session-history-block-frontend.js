@@ -136,7 +136,17 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    loadSessionHistory(); // Reload after status update
+                    // If we cancelled or completed an in-progress session, reload the entire page to refresh teacher status block
+                    if (response.data && response.data.room_cleared) {
+                        if (newStatus === 'cancelled') {
+                            alert('Buổi học đã được hủy. Phòng học đã được xóa và trạng thái của bạn đã được cập nhật về Offline.');
+                        } else if (newStatus === 'completed') {
+                            alert('Buổi học đã hoàn thành. Phòng học đã được xóa và trạng thái của bạn đã được cập nhật về Offline.');
+                        }
+                        location.reload();
+                    } else {
+                        loadSessionHistory(); // Reload after status update
+                    }
                 } else {
                     alert('Không thể cập nhật trạng thái buổi học. Vui lòng thử lại.');
                 }

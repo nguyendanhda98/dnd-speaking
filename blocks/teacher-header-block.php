@@ -70,24 +70,34 @@ class DND_Speaking_Teacher_Status_Block {
         }
 
         $user_id = get_current_user_id();
-        $available = get_user_meta($user_id, 'dnd_available', true) == '1';
+        $status = get_user_meta($user_id, 'dnd_available', true);
         $invite_link = get_user_meta($user_id, 'discord_voice_channel_invite', true);
+        
+        // If status is 'busy', show as offline but keep room link
+        // If status is '1', show as online
+        // Otherwise (0 or empty), show as offline with no room
+        $is_available = ($status == '1');
+        $is_busy = ($status === 'busy');
+        
         $room_link = $invite_link ?: '#';
         $room_text = $invite_link ? 'Tham gia phòng' : 'Link room';
 
         $output = '<div class="dnd-teacher-status">';
         
-        // Phần 1: Trạng thái
+        // Phần 1: Trạng thái (show Offline when busy)
         $output .= '<div class="status-section">';
         $output .= '<span class="status-label">Trạng thái:</span>';
         $output .= '<div class="status-toggle-container">';
         $output .= '<span class="status-text offline">Offline</span>';
         $output .= '<label class="status-toggle-label">';
-        $output .= '<input type="checkbox" id="teacher-status-toggle" ' . ($available ? 'checked' : '') . '>';
+        $output .= '<input type="checkbox" id="teacher-status-toggle" ' . ($is_available ? 'checked' : '') . ($is_busy ? ' disabled' : '') . '>';
         $output .= '<span class="status-toggle-slider"></span>';
         $output .= '</label>';
         $output .= '<span class="status-text online">Online</span>';
         $output .= '</div>';
+        if ($is_busy) {
+            $output .= '<div class="status-info" style="color: #ff9800; font-size: 12px; margin-top: 5px;">Bạn đang trong buổi học</div>';
+        }
         $output .= '<div id="discord-connect-message" class="discord-connect-message" style="display: none;"></div>';
         $output .= '</div>';
         
