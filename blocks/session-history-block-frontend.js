@@ -127,13 +127,49 @@ jQuery(document).ready(function($) {
             // Find the parent session item to disable all action buttons
             const $sessionItem = $button.closest('.dnd-history-item');
             
-            // Disable ALL action buttons in this session
-            $sessionItem.find('.dnd-btn-cancel, .dnd-btn-end').prop('disabled', true);
+            // Disable ALL action buttons in this session (including start button if present)
+            $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel, .dnd-btn-end').prop('disabled', true);
             
             // Update button text
             $button.text('Đang xử lý...');
             
             updateSessionStatus(sessionId, 'cancelled', $button, $sessionItem);
+        }
+    });
+
+    $historyBlock.on('click', '.dnd-btn-cancel-session', function() {
+        const $button = $(this);
+        const sessionId = $button.data('session-id');
+        
+        if (confirm('Bạn có chắc muốn hủy buổi học này? Phòng học sẽ bị xóa.')) {
+            // Find the parent session item to disable all action buttons
+            const $sessionItem = $button.closest('.dnd-history-item');
+            
+            // Disable ALL action buttons in this session
+            $sessionItem.find('.dnd-btn-join, .dnd-btn-complete, .dnd-btn-cancel-session').prop('disabled', true);
+            
+            // Update button text
+            $button.text('Đang xử lý...');
+            
+            updateSessionStatus(sessionId, 'cancelled', $button, $sessionItem);
+        }
+    });
+
+    $historyBlock.on('click', '.dnd-btn-complete', function() {
+        const $button = $(this);
+        const sessionId = $button.data('session-id');
+        
+        if (confirm('Bạn có chắc muốn hoàn thành buổi học này? Phòng học sẽ bị xóa.')) {
+            // Find the parent session item to disable all action buttons
+            const $sessionItem = $button.closest('.dnd-history-item');
+            
+            // Disable ALL action buttons in this session
+            $sessionItem.find('.dnd-btn-join, .dnd-btn-complete, .dnd-btn-cancel-session').prop('disabled', true);
+            
+            // Update button text
+            $button.text('Đang xử lý...');
+            
+            updateSessionStatus(sessionId, 'completed', $button, $sessionItem);
         }
     });
 
@@ -144,10 +180,67 @@ jQuery(document).ready(function($) {
     });
 
     $historyBlock.on('click', '.dnd-btn-start', function() {
-        const sessionId = $(this).data('session-id');
-        alert('Bắt đầu buổi học: ' + sessionId);
-        // Update status to in_progress
-        updateSessionStatus(sessionId, 'in_progress');
+        const $button = $(this);
+        const sessionId = $button.data('session-id');
+        const studentId = $button.data('student-id');
+        
+        if (confirm('Bạn có chắc muốn bắt đầu buổi học này?')) {
+            // Find the parent session item to disable all action buttons
+            const $sessionItem = $button.closest('.dnd-history-item');
+            
+            // Disable ALL buttons in this session (both start and cancel)
+            $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel').prop('disabled', true);
+            
+            // Update button text to show loading
+            $button.text('Đang tạo phòng học...');
+            
+            // Call REST API endpoint to start session
+            $.ajax({
+                url: dnd_session_history_data.rest_url + 'teacher/start-session',
+                method: 'POST',
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader('X-WP-Nonce', dnd_session_history_data.nonce);
+                },
+                data: JSON.stringify({
+                    session_id: sessionId
+                }),
+                contentType: 'application/json',
+                success: function(response) {
+                    if (response.success) {
+                        alert('Phòng học đã được tạo thành công! Bạn có thể tham gia ngay.');
+                        // Reload the session history to show the join button
+                        loadSessionHistory();
+                    } else {
+                        // Re-enable buttons on error
+                        $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel').prop('disabled', false);
+                        $button.text('Bắt đầu');
+                        
+                        const errorMsg = response.message || 'Không thể bắt đầu buổi học. Vui lòng thử lại.';
+                        alert(errorMsg);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    // Re-enable buttons on error
+                    $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel').prop('disabled', false);
+                    $button.text('Bắt đầu');
+                    
+                    console.error('Error starting session:', xhr.responseText, status, error);
+                    
+                    // Try to parse error message from response
+                    let errorMsg = 'Có lỗi xảy ra khi bắt đầu buổi học.';
+                    try {
+                        const errorResponse = JSON.parse(xhr.responseText);
+                        if (errorResponse.message) {
+                            errorMsg = errorResponse.message;
+                        }
+                    } catch (e) {
+                        // Use default error message
+                    }
+                    
+                    alert(errorMsg);
+                }
+            });
+        }
     });
 
     $historyBlock.on('click', '.dnd-btn-end', function() {
@@ -195,8 +288,15 @@ jQuery(document).ready(function($) {
                     // Re-enable buttons on error
                     if ($sessionItem) {
                         // Re-enable the appropriate buttons based on status being attempted
-                        if (newStatus === 'confirmed' || newStatus === 'cancelled') {
+                        if (newStatus === 'confirmed' || (newStatus === 'cancelled' && $button && $button.hasClass('dnd-btn-reject'))) {
                             $sessionItem.find('.dnd-btn-confirm, .dnd-btn-reject').prop('disabled', false);
+                        } else if (newStatus === 'cancelled' && $button && $button.hasClass('dnd-btn-cancel-session')) {
+                            $sessionItem.find('.dnd-btn-join, .dnd-btn-complete, .dnd-btn-cancel-session').prop('disabled', false);
+                        } else if (newStatus === 'completed' && $button && $button.hasClass('dnd-btn-complete')) {
+                            $sessionItem.find('.dnd-btn-join, .dnd-btn-complete, .dnd-btn-cancel-session').prop('disabled', false);
+                        } else if (newStatus === 'cancelled' && $button && $button.hasClass('dnd-btn-cancel')) {
+                            // Re-enable both start and cancel buttons for confirmed sessions
+                            $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel, .dnd-btn-end').prop('disabled', false);
                         } else {
                             $sessionItem.find('.dnd-btn-cancel, .dnd-btn-end').prop('disabled', false);
                         }
@@ -207,14 +307,20 @@ jQuery(document).ready(function($) {
                     // Restore original text based on status
                     if ($button) {
                         if (newStatus === 'cancelled') {
-                            // Could be from reject or cancel button
+                            // Could be from reject, cancel, or cancel-session button
                             if ($button.hasClass('dnd-btn-reject')) {
                                 $button.text('Từ chối');
+                            } else if ($button.hasClass('dnd-btn-cancel-session')) {
+                                $button.text('Hủy');
                             } else {
                                 $button.text('Hủy buổi học');
                             }
                         } else if (newStatus === 'completed') {
-                            $button.text('Kết thúc');
+                            if ($button.hasClass('dnd-btn-complete')) {
+                                $button.text('Hoàn thành');
+                            } else {
+                                $button.text('Kết thúc');
+                            }
                         } else if (newStatus === 'confirmed') {
                             $button.text('Xác nhận');
                         }
@@ -228,6 +334,13 @@ jQuery(document).ready(function($) {
                     // Re-enable the appropriate buttons based on status being attempted
                     if (newStatus === 'confirmed' || (newStatus === 'cancelled' && $button && $button.hasClass('dnd-btn-reject'))) {
                         $sessionItem.find('.dnd-btn-confirm, .dnd-btn-reject').prop('disabled', false);
+                    } else if (newStatus === 'cancelled' && $button && $button.hasClass('dnd-btn-cancel-session')) {
+                        $sessionItem.find('.dnd-btn-join, .dnd-btn-complete, .dnd-btn-cancel-session').prop('disabled', false);
+                    } else if (newStatus === 'completed' && $button && $button.hasClass('dnd-btn-complete')) {
+                        $sessionItem.find('.dnd-btn-join, .dnd-btn-complete, .dnd-btn-cancel-session').prop('disabled', false);
+                    } else if (newStatus === 'cancelled' && $button && $button.hasClass('dnd-btn-cancel')) {
+                        // Re-enable both start and cancel buttons for confirmed sessions
+                        $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel, .dnd-btn-end').prop('disabled', false);
                     } else {
                         $sessionItem.find('.dnd-btn-cancel, .dnd-btn-end').prop('disabled', false);
                     }
@@ -238,14 +351,20 @@ jQuery(document).ready(function($) {
                 // Restore original text based on status
                 if ($button) {
                     if (newStatus === 'cancelled') {
-                        // Could be from reject or cancel button
+                        // Could be from reject, cancel, or cancel-session button
                         if ($button.hasClass('dnd-btn-reject')) {
                             $button.text('Từ chối');
+                        } else if ($button.hasClass('dnd-btn-cancel-session')) {
+                            $button.text('Hủy');
                         } else {
                             $button.text('Hủy buổi học');
                         }
                     } else if (newStatus === 'completed') {
-                        $button.text('Kết thúc');
+                        if ($button.hasClass('dnd-btn-complete')) {
+                            $button.text('Hoàn thành');
+                        } else {
+                            $button.text('Kết thúc');
+                        }
                     } else if (newStatus === 'confirmed') {
                         $button.text('Xác nhận');
                     }

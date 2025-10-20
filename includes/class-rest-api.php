@@ -107,6 +107,13 @@ class DND_Speaking_REST_API {
             'permission_callback' => [$this, 'check_user_logged_in'],
         ]);
 
+        // Teacher start session endpoint
+        register_rest_route('dnd-speaking/v1', '/teacher/start-session', [
+            'methods' => 'POST',
+            'callback' => [$this, 'teacher_start_session'],
+            'permission_callback' => [$this, 'check_user_logged_in'],
+        ]);
+
         // Test endpoint
         register_rest_route('dnd-speaking/v1', '/test', [
             'methods' => 'GET',
@@ -864,6 +871,10 @@ class DND_Speaking_REST_API {
                 $status_class = '';
                 $status_text = '';
                 switch ($session->status) {
+                    case 'confirmed':
+                        $status_class = 'confirmed';
+                        $status_text = 'Đã xác nhận';
+                        break;
                     case 'in_progress':
                         $status_class = 'in_progress';
                         $status_text = 'Đang diễn ra';
@@ -893,11 +904,21 @@ class DND_Speaking_REST_API {
                 $output .= '<div class="dnd-session-datetime">' . $formatted_date . ' at ' . $formatted_time . '</div>';
                 $output .= '<div class="dnd-session-duration">Duration: ' . $duration . '</div>';
 
+                // Show start button for confirmed sessions
+                if ($session->status === 'confirmed') {
+                    $output .= '<div class="dnd-session-actions">';
+                    $output .= '<button class="dnd-btn dnd-btn-start" data-session-id="' . $session->id . '" data-student-id="' . $session->student_id . '">Bắt đầu</button>';
+                    $output .= '<button class="dnd-btn dnd-btn-cancel" data-session-id="' . $session->id . '">Hủy buổi học</button>';
+                    $output .= '</div>';
+                }
+
                 // Show join button for in_progress sessions
                 if ($session->status === 'in_progress' && !empty($session->discord_channel)) {
                     error_log('TEACHER SESSION HISTORY - Adding join button for session ID=' . $session->id);
                     $output .= '<div class="dnd-session-actions">';
                     $output .= '<a href="' . esc_url($session->discord_channel) . '" class="dnd-btn dnd-btn-join" target="_blank">Tham gia ngay</a>';
+                    $output .= '<button class="dnd-btn dnd-btn-complete" data-session-id="' . $session->id . '">Hoàn thành</button>';
+                    $output .= '<button class="dnd-btn dnd-btn-cancel-session" data-session-id="' . $session->id . '">Hủy</button>';
                     $output .= '</div>';
                 }
 
@@ -2156,6 +2177,146 @@ class DND_Speaking_REST_API {
             'session_id' => $session_id,
             'room_link' => $room_link,
             'message' => 'Phiên học đã được tạo thành công!'
+        ], 200);
+    }
+
+    /**
+     * Teacher Start Session - Start a confirmed session by sending webhook to create Discord room
+     */
+    public function teacher_start_session($request) {
+        global $wpdb;
+        
+        $user_id = get_current_user_id();
+        $session_id = intval($request->get_param('session_id'));
+        
+        if (!$session_id) {
+            return new WP_Error('missing_session_id', 'Session ID is required', ['status' => 400]);
+        }
+        
+        // Get session and verify it belongs to this teacher
+        $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
+        $session = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $sessions_table WHERE id = %d AND teacher_id = %d AND status = 'confirmed'",
+            $session_id, $user_id
+        ));
+        
+        if (!$session) {
+            return new WP_Error('session_not_found', 'Session không tồn tại hoặc không thuộc quyền của bạn', ['status' => 404]);
+        }
+        
+        // Get teacher's Discord info
+        $teacher_discord_id = get_user_meta($user_id, 'discord_user_id', true);
+        $teacher_discord_name = get_user_meta($user_id, 'discord_global_name', true) ?: get_user_meta($user_id, 'discord_username', true);
+        
+        if (!$teacher_discord_id) {
+            return new WP_Error('teacher_discord_not_connected', 'Giáo viên chưa kết nối Discord', ['status' => 400]);
+        }
+        
+        // Get student's Discord info
+        $student_discord_id = get_user_meta($session->student_id, 'discord_user_id', true);
+        $student_discord_name = get_user_meta($session->student_id, 'discord_global_name', true) ?: get_user_meta($session->student_id, 'discord_username', true);
+        
+        if (!$student_discord_id) {
+            return new WP_Error('student_discord_not_connected', 'Học viên chưa kết nối Discord', ['status' => 400]);
+        }
+        
+        // Send webhook to create Discord room
+        $webhook_url = get_option('dnd_discord_webhook');
+        if (!$webhook_url) {
+            return new WP_Error('webhook_not_configured', 'Webhook chưa được cấu hình', ['status' => 500]);
+        }
+        
+        error_log('TEACHER START SESSION - Sending webhook for session: ' . $session_id);
+        error_log('TEACHER START SESSION - Teacher Discord: ' . $teacher_discord_id . ' (' . $teacher_discord_name . ')');
+        error_log('TEACHER START SESSION - Student Discord: ' . $student_discord_id . ' (' . $student_discord_name . ')');
+        
+        $webhook_response = wp_remote_post($webhook_url, [
+            'headers' => [
+                'Content-Type' => 'application/json'
+            ],
+            'body' => json_encode([
+                'action' => 'teacher_start_session',
+                'session_id' => $session_id,
+                'teacher_discord_id' => $teacher_discord_id,
+                'teacher_discord_name' => $teacher_discord_name,
+                'teacher_wp_id' => $user_id,
+                'student_discord_id' => $student_discord_id,
+                'student_discord_name' => $student_discord_name,
+                'student_wp_id' => $session->student_id,
+                'server_id' => get_option('dnd_discord_server_id')
+            ]),
+            'timeout' => 30,
+            'blocking' => true
+        ]);
+        
+        if (is_wp_error($webhook_response)) {
+            error_log('TEACHER START SESSION - Webhook error: ' . $webhook_response->get_error_message());
+            return new WP_Error('webhook_error', 'Không thể kết nối đến server Discord: ' . $webhook_response->get_error_message(), ['status' => 500]);
+        }
+        
+        $response_code = wp_remote_retrieve_response_code($webhook_response);
+        $response_body = json_decode(wp_remote_retrieve_body($webhook_response), true);
+        
+        error_log('TEACHER START SESSION - Webhook response code: ' . $response_code);
+        error_log('TEACHER START SESSION - Webhook response body: ' . print_r($response_body, true));
+        
+        if ($response_code !== 200) {
+            return new WP_Error('webhook_failed', 'Server Discord trả về lỗi (Code: ' . $response_code . ')', ['status' => 500]);
+        }
+        
+        if (!isset($response_body['success']) || !$response_body['success']) {
+            $error_message = isset($response_body['message']) ? $response_body['message'] : 'Không thể tạo phòng học';
+            error_log('TEACHER START SESSION - Webhook returned error: ' . $error_message);
+            return new WP_Error('room_creation_failed', $error_message, ['status' => 500]);
+        }
+        
+        // Get room link from webhook response
+        $room_id = isset($response_body['channelId']) ? $response_body['channelId'] : '';
+        $room_link = isset($response_body['room_link']) ? $response_body['room_link'] : '';
+        
+        // If no room link provided, construct it from room_id
+        if (!$room_link && $room_id) {
+            $server_id = get_option('dnd_discord_server_id');
+            $room_link = "https://discord.com/channels/{$server_id}/{$room_id}";
+        }
+        
+        if (!$room_link) {
+            return new WP_Error('no_room_link', 'Không nhận được link phòng học từ Discord', ['status' => 500]);
+        }
+        
+        // Update session to in_progress with room link
+        $update_result = $wpdb->update(
+            $sessions_table,
+            [
+                'status' => 'in_progress',
+                'discord_channel' => $room_link,
+                'start_time' => current_time('mysql')
+            ],
+            ['id' => $session_id],
+            ['%s', '%s', '%s'],
+            ['%d']
+        );
+        
+        if ($update_result === false) {
+            error_log('TEACHER START SESSION - Failed to update session. Error: ' . $wpdb->last_error);
+            return new WP_Error('db_update_failed', 'Không thể cập nhật session trong database', ['status' => 500]);
+        }
+        
+        // Store room info for teacher
+        update_user_meta($user_id, 'discord_voice_channel_id', $room_id);
+        update_user_meta($user_id, 'discord_voice_channel_invite', $room_link);
+        
+        // Set teacher status to busy
+        update_user_meta($user_id, 'dnd_available', 'busy');
+        
+        error_log('TEACHER START SESSION - Session started successfully. ID: ' . $session_id . ', Room Link: ' . $room_link);
+        error_log('TEACHER START SESSION - Teacher ' . $user_id . ' status set to busy');
+        
+        return new WP_REST_Response([
+            'success' => true,
+            'session_id' => $session_id,
+            'room_link' => $room_link,
+            'message' => 'Phiên học đã được bắt đầu thành công!'
         ], 200);
     }
 }
