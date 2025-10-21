@@ -1,0 +1,29 @@
+/* DND Speaking WooCommerce Styles */
+
+.dnd-lesson-amount {
+    margin: 15px 0;
+    padding: 15px;
+    background-color: #f7f7f7;
+    border-left: 4px solid #0073aa;
+    font-size: 16px;
+}
+
+.dnd-lesson-amount strong {
+    color: #0073aa;
+}
+
+/* Admin product data styling */
+#dnd_speaking_product_data .options_group {
+    padding: 12px;
+}
+
+#dnd_speaking_product_data .form-field {
+    padding: 0 12px;
+}
+
+/* Cart item lesson amount */
+.woocommerce-cart-form__cart-item .dnd-lesson-sessions,
+.woocommerce-checkout-review-order-table .dnd-lesson-sessions {
+    font-size: 0.9em;
+    color: #666;
+}

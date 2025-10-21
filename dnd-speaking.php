@@ -38,6 +38,11 @@ add_action('plugins_loaded', function() {
     
     new DND_Speaking_REST_API();
     new DND_Speaking_Admin();
+    
+    // Initialize WooCommerce integration if WooCommerce is active
+    if (class_exists('WooCommerce')) {
+        new DND_Speaking_WooCommerce();
+    }
 });
 
 // Enqueue blocks script
