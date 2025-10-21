@@ -13,11 +13,14 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.dnd-btn-book', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        alert('Book now clicked! Teacher ID: ' + $(this).data('teacher-id'));
         console.log('Book now clicked for teacher:', $(this).data('teacher-id'));
         const teacherId = $(this).data('teacher-id');
         const teacherName = $(this).closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
-        openBookingModal(teacherId, teacherName);
+        
+        // Check credits before opening booking modal
+        checkCreditsAndProceed(function() {
+            openBookingModal(teacherId, teacherName);
+        });
         return false;
     });
 
@@ -112,10 +115,13 @@ jQuery(document).ready(function($) {
             const teacherId = $button.data('teacher-id');
             const teacherName = $button.closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
             
-            // Disable button immediately to prevent spam
-            $button.prop('disabled', true).text('Đang xử lý...');
-            
-            startNowSession(teacherId, teacherName, $button);
+            // Check credits before starting session
+            checkCreditsAndProceed(function() {
+                // Disable button immediately to prevent spam
+                $button.prop('disabled', true).text('Đang xử lý...');
+                
+                startNowSession(teacherId, teacherName, $button);
+            });
         });
     }
 
@@ -368,4 +374,28 @@ jQuery(document).ready(function($) {
     //     const teacherName = $(this).closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
     //     openBookingModal(teacherId, teacherName);
     // });
+
+    // Check credits before proceeding with booking or starting session
+    function checkCreditsAndProceed(callback) {
+        $.ajax({
+            url: dnd_speaking_data.rest_url + 'credits',
+            method: 'GET',
+            headers: {
+                'X-WP-Nonce': dnd_speaking_data.nonce
+            },
+            success: function(response) {
+                if (response.credits && response.credits > 0) {
+                    // Has credits, proceed
+                    callback();
+                } else {
+                    // No credits
+                    alert('Bạn không đủ số buổi học. Vui lòng nạp thêm buổi học để tiếp tục.');
+                }
+            },
+            error: function(xhr) {
+                console.error('Error checking credits:', xhr);
+                alert('Không thể kiểm tra số buổi học. Vui lòng thử lại.');
+            }
+        });
+    }
 });
