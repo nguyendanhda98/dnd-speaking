@@ -14,12 +14,30 @@ jQuery(document).ready(function($) {
         e.preventDefault();
         e.stopPropagation();
         console.log('Book now clicked for teacher:', $(this).data('teacher-id'));
-        const teacherId = $(this).data('teacher-id');
-        const teacherName = $(this).closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
+        
+        const $button = $(this);
+        const $card = $button.closest('.dnd-teacher-card');
+        const teacherId = $button.data('teacher-id');
+        const teacherName = $card.find('.dnd-teacher-name').text();
+        
+        // Disable both buttons immediately to prevent spam
+        const $allButtons = $card.find('.dnd-btn');
+        $allButtons.prop('disabled', true);
+        
+        // Show loading state on clicked button
+        const originalHtml = $button.html();
+        $button.html('<span class="dnd-btn-loading"></span> Đang xử lý...');
         
         // Check credits before opening booking modal
         checkCreditsAndProceed(function() {
+            // Re-enable buttons after credit check passes
+            $allButtons.prop('disabled', false);
+            $button.html(originalHtml);
             openBookingModal(teacherId, teacherName);
+        }, function() {
+            // Re-enable buttons if credit check fails
+            $allButtons.prop('disabled', false);
+            $button.html(originalHtml);
         });
         return false;
     });
@@ -112,25 +130,39 @@ jQuery(document).ready(function($) {
 
         $('.dnd-btn-start').on('click', function() {
             const $button = $(this);
+            const $card = $button.closest('.dnd-teacher-card');
             const teacherId = $button.data('teacher-id');
-            const teacherName = $button.closest('.dnd-teacher-card').find('.dnd-teacher-name').text();
+            const teacherName = $card.find('.dnd-teacher-name').text();
+            
+            // Disable both buttons immediately to prevent spam
+            const $allButtons = $card.find('.dnd-btn');
+            $allButtons.prop('disabled', true);
+            
+            // Show loading state on clicked button
+            const originalHtml = $button.html();
+            $button.html('<span class="dnd-btn-loading"></span> Đang xử lý...');
             
             // Check credits before starting session
             checkCreditsAndProceed(function() {
-                // Disable button immediately to prevent spam
-                $button.prop('disabled', true).text('Đang xử lý...');
-                
-                startNowSession(teacherId, teacherName, $button);
+                // Keep buttons disabled and continue with start now
+                startNowSession(teacherId, teacherName, $button, $allButtons, originalHtml);
+            }, function() {
+                // Re-enable buttons if credit check fails
+                $allButtons.prop('disabled', false);
+                $button.html(originalHtml);
             });
         });
     }
 
-    function startNowSession(teacherId, teacherName, $button) {
+    function startNowSession(teacherId, teacherName, $button, $allButtons, originalHtml) {
         // Show confirmation dialog
         if (!confirm(`Bạn có muốn bắt đầu phiên học với ${teacherName} ngay bây giờ không?`)) {
-            // User cancelled, re-enable button
+            // User cancelled, re-enable buttons
+            if ($allButtons) {
+                $allButtons.prop('disabled', false);
+            }
             if ($button) {
-                $button.prop('disabled', false).text('🎤 Start Now');
+                $button.html(originalHtml);
             }
             return;
         }
@@ -155,15 +187,21 @@ jQuery(document).ready(function($) {
                     // Successfully created session, redirect directly to Discord room
                     window.location.href = response.room_link;
                 } else if (response.teacher_not_available) {
-                    // Teacher is offline or busy - re-enable button
+                    // Teacher is offline or busy - re-enable buttons
+                    if ($allButtons) {
+                        $allButtons.prop('disabled', false);
+                    }
                     if ($button) {
-                        $button.prop('disabled', false).text('🎤 Start Now');
+                        $button.html(originalHtml);
                     }
                     alert(response.message);
                 } else if (response.need_discord_connection) {
-                    // Need to connect Discord first - re-enable button
+                    // Need to connect Discord first - re-enable buttons
+                    if ($allButtons) {
+                        $allButtons.prop('disabled', false);
+                    }
                     if ($button) {
-                        $button.prop('disabled', false).text('🎤 Start Now');
+                        $button.html(originalHtml);
                     }
                     if (confirm(response.message + '\n\nBạn có muốn kết nối Discord ngay bây giờ không?')) {
                         window.location.href = response.discord_auth_url;
@@ -174,15 +212,21 @@ jQuery(document).ready(function($) {
                         // Redirect to existing room
                         window.location.href = response.room_link;
                     } else {
-                        // User doesn't want to join existing room - re-enable button
+                        // User doesn't want to join existing room - re-enable buttons
+                        if ($allButtons) {
+                            $allButtons.prop('disabled', false);
+                        }
                         if ($button) {
-                            $button.prop('disabled', false).text('🎤 Start Now');
+                            $button.html(originalHtml);
                         }
                     }
                 } else {
-                    // Other error - re-enable button
+                    // Other error - re-enable buttons
+                    if ($allButtons) {
+                        $allButtons.prop('disabled', false);
+                    }
                     if ($button) {
-                        $button.prop('disabled', false).text('🎤 Start Now');
+                        $button.html(originalHtml);
                     }
                     alert(response.message || 'Có lỗi xảy ra, vui lòng thử lại.');
                 }
@@ -190,9 +234,12 @@ jQuery(document).ready(function($) {
             error: function(xhr) {
                 $loadingModal.remove();
                 
-                // Re-enable button on error
+                // Re-enable buttons on error
+                if ($allButtons) {
+                    $allButtons.prop('disabled', false);
+                }
                 if ($button) {
-                    $button.prop('disabled', false).text('🎤 Start Now');
+                    $button.html(originalHtml);
                 }
                 
                 const errorMessage = xhr.responseJSON && xhr.responseJSON.message 
@@ -376,7 +423,7 @@ jQuery(document).ready(function($) {
     // });
 
     // Check credits before proceeding with booking or starting session
-    function checkCreditsAndProceed(callback) {
+    function checkCreditsAndProceed(successCallback, failCallback) {
         $.ajax({
             url: dnd_speaking_data.rest_url + 'credits',
             method: 'GET',
@@ -386,15 +433,21 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.credits && response.credits > 0) {
                     // Has credits, proceed
-                    callback();
+                    successCallback();
                 } else {
                     // No credits
                     alert('Bạn không đủ số buổi học. Vui lòng nạp thêm buổi học để tiếp tục.');
+                    if (failCallback) {
+                        failCallback();
+                    }
                 }
             },
             error: function(xhr) {
                 console.error('Error checking credits:', xhr);
                 alert('Không thể kiểm tra số buổi học. Vui lòng thử lại.');
+                if (failCallback) {
+                    failCallback();
+                }
             }
         });
     }
