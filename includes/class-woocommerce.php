@@ -79,14 +79,17 @@ class DND_Speaking_WooCommerce {
             'data_type' => 'price',
         ]);
         
-        // Sale Price
-        woocommerce_wp_text_input([
-            'id' => '_sale_price',
-            'class' => 'wc_input_price short',
-            'label' => __('Sale price', 'woocommerce') . ' (' . get_woocommerce_currency_symbol() . ')',
-            'data_type' => 'price',
-            'description' => '<a href="#" class="sale_schedule">' . __('Schedule', 'woocommerce') . '</a>',
-        ]);
+        // Sale Price - Remove validation
+        echo '<p class="form-field _sale_price_field">
+            <label for="_sale_price">' . __('Sale price', 'woocommerce') . ' (' . get_woocommerce_currency_symbol() . ')</label>
+            <input type="text" class="short wc_input_price" name="_sale_price" id="_sale_price" value="' . esc_attr(get_post_meta($post->ID, '_sale_price', true)) . '" placeholder="">
+        </p>';
+        
+        // Schedule link
+        echo '<p class="form-field">
+            <label>&nbsp;</label>
+            <a href="#" class="sale_schedule">' . __('Schedule', 'woocommerce') . '</a>
+        </p>';
         
         // Schedule Sale fields - hidden by default
         $sale_price_dates_from = get_post_meta($post->ID, '_sale_price_dates_from', true);

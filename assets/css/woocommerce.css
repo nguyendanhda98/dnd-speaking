@@ -21,6 +21,26 @@
     padding: 0 12px;
 }
 
+/* Fix Schedule link display */
+#dnd_main_product_data .sale_schedule {
+    display: inline-block;
+    margin-left: 150px;
+}
+
+#dnd_main_product_data .form-field label {
+    display: inline-block;
+    width: 150px;
+}
+
+#dnd_main_product_data .sale_price_dates_fields {
+    clear: both;
+    padding-top: 10px;
+}
+
+#dnd_main_product_data .sale_price_dates_fields input {
+    margin-right: 5px;
+}
+
 /* Cart item lesson amount */
 .woocommerce-cart-form__cart-item .dnd-lesson-sessions,
 .woocommerce-checkout-review-order-table .dnd-lesson-sessions {
