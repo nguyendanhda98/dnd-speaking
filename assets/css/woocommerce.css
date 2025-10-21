@@ -24,12 +24,22 @@
 /* Fix Schedule link display */
 #dnd_main_product_data .sale_schedule {
     display: inline-block;
-    margin-left: 150px;
+    margin-left: 0;
+    line-height: 28px;
+    vertical-align: middle;
 }
 
-#dnd_main_product_data .form-field label {
-    display: inline-block;
-    width: 150px;
+#dnd_main_product_data ._sale_price_field {
+    margin-bottom: 0 !important;
+}
+
+#dnd_main_product_data ._sale_price_field + .form-field {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+#dnd_main_product_data ._sale_price_field + .form-field label {
+    display: none;
 }
 
 #dnd_main_product_data .sale_price_dates_fields {
