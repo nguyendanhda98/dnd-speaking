@@ -188,7 +188,7 @@ class DND_Speaking_REST_API {
                  FROM $sessions_table s
                  LEFT JOIN {$wpdb->users} u ON s.student_id = u.ID
                  WHERE $where_clause
-                 ORDER BY s.start_time DESC
+                 ORDER BY s.created_at DESC
                  LIMIT %d OFFSET %d",
                 array_merge($query_params, [$per_page, $offset])
             ));
@@ -342,6 +342,14 @@ class DND_Speaking_REST_API {
                 'status' => $available_status, // Return raw status for frontend display
             ];
         }
+
+        // Sort teachers: online first, then busy, then offline
+        usort($teachers, function($a, $b) {
+            // Define sort priority: online (1) = 0, busy = 1, offline = 2
+            $priority_a = ($a['status'] === '1') ? 0 : (($a['status'] === 'busy') ? 1 : 2);
+            $priority_b = ($b['status'] === '1') ? 0 : (($b['status'] === 'busy') ? 1 : 2);
+            return $priority_a - $priority_b;
+        });
 
         return $teachers;
     }
@@ -1415,7 +1423,7 @@ class DND_Speaking_REST_API {
              FROM $sessions_table s
              LEFT JOIN {$wpdb->users} t ON s.teacher_id = t.ID
              WHERE $where_clause
-             ORDER BY s.start_time DESC
+             ORDER BY s.created_at DESC
              LIMIT %d OFFSET %d",
             array_merge($query_params, [$per_page, $offset])
         ));
