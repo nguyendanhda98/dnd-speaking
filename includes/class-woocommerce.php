@@ -69,39 +69,48 @@ class DND_Speaking_WooCommerce {
         
         echo '<div id="dnd_main_product_data" class="panel woocommerce_options_panel hidden">';
         
-        echo '<div class="options_group">';
+        echo '<div class="options_group pricing show_if_simple show_if_external show_if_dnd_speaking">';
         
         // Regular Price
         woocommerce_wp_text_input([
             'id' => '_regular_price',
+            'class' => 'wc_input_price short',
             'label' => __('Regular price', 'woocommerce') . ' (' . get_woocommerce_currency_symbol() . ')',
             'data_type' => 'price',
-            'desc_tip' => true,
-            'description' => __('Set the regular price for this product.', 'dnd-speaking'),
         ]);
         
         // Sale Price
         woocommerce_wp_text_input([
             'id' => '_sale_price',
+            'class' => 'wc_input_price short',
             'label' => __('Sale price', 'woocommerce') . ' (' . get_woocommerce_currency_symbol() . ')',
             'data_type' => 'price',
-            'desc_tip' => true,
-            'description' => __('Set the sale price for this product.', 'dnd-speaking'),
+            'description' => '<a href="#" class="sale_schedule">' . __('Schedule', 'woocommerce') . '</a>',
         ]);
         
-        // Schedule Sale
+        // Schedule Sale fields - hidden by default
         $sale_price_dates_from = get_post_meta($post->ID, '_sale_price_dates_from', true);
         $sale_price_dates_to = get_post_meta($post->ID, '_sale_price_dates_to', true);
         
-        echo '<p class="form-field sale_price_dates_fields">
-            <label for="_sale_price_dates_from">' . __('Schedule', 'woocommerce') . '</label>
+        $sale_price_dates_from_timestamp = $sale_price_dates_from ? date_i18n('Y-m-d', $sale_price_dates_from) : '';
+        $sale_price_dates_to_timestamp = $sale_price_dates_to ? date_i18n('Y-m-d', $sale_price_dates_to) : '';
+        
+        $sale_schedule_set = $sale_price_dates_from || $sale_price_dates_to;
+        
+        echo '<p class="form-field sale_price_dates_fields' . ($sale_schedule_set ? '' : ' hidden') . '">
+            <label for="_sale_price_dates_from">' . esc_html__('Sale price dates', 'woocommerce') . '</label>
             <input type="text" class="short" name="_sale_price_dates_from" id="_sale_price_dates_from" 
-                   value="' . ($sale_price_dates_from ? date_i18n('Y-m-d', $sale_price_dates_from) : '') . '" 
-                   placeholder="' . _x('From&hellip;', 'placeholder', 'woocommerce') . ' YYYY-MM-DD" maxlength="10" pattern="[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])" />
+                   value="' . esc_attr($sale_price_dates_from_timestamp) . '" 
+                   placeholder="' . esc_html(_x('From&hellip;', 'placeholder', 'woocommerce')) . ' YYYY-MM-DD" maxlength="10" pattern="[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])" />
             <input type="text" class="short" name="_sale_price_dates_to" id="_sale_price_dates_to" 
-                   value="' . ($sale_price_dates_to ? date_i18n('Y-m-d', $sale_price_dates_to) : '') . '" 
-                   placeholder="' . _x('To&hellip;', 'placeholder', 'woocommerce') . ' YYYY-MM-DD" maxlength="10" pattern="[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])" />
+                   value="' . esc_attr($sale_price_dates_to_timestamp) . '" 
+                   placeholder="' . esc_html(_x('To&hellip;', 'placeholder', 'woocommerce')) . ' YYYY-MM-DD" maxlength="10" pattern="[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])" />
+            <a href="#" class="description cancel_sale_schedule">' . esc_html__('Cancel', 'woocommerce') . '</a>
         </p>';
+        
+        echo '</div>';
+        
+        echo '<div class="options_group">';
         
         // Tax Status
         woocommerce_wp_select([
@@ -192,6 +201,33 @@ class DND_Speaking_WooCommerce {
                         $('.product_data_tabs li').removeClass('active');
                         $(this).addClass('active');
                     }
+                });
+                
+                // Initialize datepicker for sale schedule fields in DND Main tab
+                $('#dnd_main_product_data #_sale_price_dates_from, #dnd_main_product_data #_sale_price_dates_to').datepicker({
+                    dateFormat: 'yy-mm-dd',
+                    numberOfMonths: 1,
+                    showButtonPanel: true,
+                    changeMonth: true,
+                    changeYear: true
+                });
+                
+                // Handle "Schedule" link click to show date fields
+                $('#dnd_main_product_data').on('click', '.sale_schedule', function(e) {
+                    e.preventDefault();
+                    var $sale_schedule_fields = $(this).closest('.options_group').find('.sale_price_dates_fields');
+                    $sale_schedule_fields.slideToggle();
+                    return false;
+                });
+                
+                // Handle cancel sale schedule
+                $('#dnd_main_product_data').on('click', '.cancel_sale_schedule', function(e) {
+                    e.preventDefault();
+                    var $this = $(this);
+                    $this.closest('.sale_price_dates_fields').slideUp();
+                    $('#dnd_main_product_data #_sale_price_dates_from').val('');
+                    $('#dnd_main_product_data #_sale_price_dates_to').val('');
+                    return false;
                 });
             });
         </script>
