@@ -122,18 +122,21 @@
 .dnd-modal-content {
     background: white;
     border-radius: 8px;
-    padding: 20px;
     max-width: 600px;
     width: 90%;
     max-height: 80vh;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .dnd-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    padding: 20px 20px 15px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
 }
 
 .dnd-modal-title {
@@ -146,6 +149,12 @@
     border: none;
     font-size: 24px;
     cursor: pointer;
+}
+
+#dnd-availability-slots {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
 }
 
 .dnd-availability-grid {
@@ -186,13 +195,17 @@
 }
 
 .dnd-book-btn {
-    margin-top: 20px;
-    padding: 10px 20px;
+    padding: 12px 20px;
     background: #007cba;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-top: 1px solid #e0e0e0;
     cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    width: 100%;
+    flex-shrink: 0;
+    transition: background 0.3s;
 }
 
 .dnd-book-btn:hover {

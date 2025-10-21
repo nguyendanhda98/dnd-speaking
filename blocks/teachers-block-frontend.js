@@ -113,7 +113,7 @@ jQuery(document).ready(function($) {
                             <button class="dnd-modal-close">&times;</button>
                         </div>
                         <div id="dnd-availability-slots"></div>
-                        <button id="dnd-confirm-booking" class="dnd-book-btn" style="display:none;">Book Selected Slot</button>
+                        <button id="dnd-confirm-booking" class="dnd-book-btn">Select a time slot</button>
                     </div>
                 </div>
             `);
@@ -277,7 +277,9 @@ jQuery(document).ready(function($) {
     function openBookingModal(teacherId, teacherName) {
         $('#dnd-booking-modal .dnd-modal-title').text('Book Session with ' + teacherName);
         $('#dnd-availability-slots').html('<p>Loading availability...</p>');
-        $('#dnd-confirm-booking').hide();
+        
+        // Show button but keep it disabled until slot is selected
+        $('#dnd-confirm-booking').show().prop('disabled', true).text('Select a time slot');
 
         // Fetch availability
         $.ajax({
@@ -344,7 +346,9 @@ jQuery(document).ready(function($) {
             $('.dnd-time-slot').removeClass('selected');
             $(this).addClass('selected');
             selectedSlot = $(this).data('datetime');
-            $('#dnd-confirm-booking').show();
+            
+            // Enable button and change text when slot is selected
+            $('#dnd-confirm-booking').prop('disabled', false).text('Book Selected Slot');
         });
 
         // Handle booking confirmation
@@ -375,9 +379,9 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     alert('Session booked successfully!');
                     $('#dnd-booking-modal').removeClass('show');
-                    // Re-enable button
+                    // Reset button state
                     if ($button) {
-                        $button.prop('disabled', false).text('Xác nhận đặt lịch');
+                        $button.prop('disabled', true).text('Select a time slot');
                     }
                     // Refresh upcoming sessions if needed
                     if (typeof window.refreshStudentSessions === 'function') {
@@ -386,7 +390,7 @@ jQuery(document).ready(function($) {
                 } else {
                     // Re-enable button on error
                     if ($button) {
-                        $button.prop('disabled', false).text('Xác nhận đặt lịch');
+                        $button.prop('disabled', false).text('Book Selected Slot');
                     }
                     alert('Failed to book session: ' + (response.message || 'Unknown error'));
                 }
@@ -394,7 +398,7 @@ jQuery(document).ready(function($) {
             error: function(xhr) {
                 // Re-enable button on error
                 if ($button) {
-                    $button.prop('disabled', false).text('Xác nhận đặt lịch');
+                    $button.prop('disabled', false).text('Book Selected Slot');
                 }
                 alert('Error booking session: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error'));
             }
