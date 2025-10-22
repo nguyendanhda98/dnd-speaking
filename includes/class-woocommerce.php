@@ -6,10 +6,10 @@
 class DND_Speaking_WooCommerce {
 
     public function __construct() {
-        // Add custom product type
-        add_filter('product_type_selector', [$this, 'add_product_type']);
+        // Don't add custom product type - use Simple product instead
+        // add_filter('product_type_selector', [$this, 'add_product_type']);
         
-        // Add custom tab and fields to product data
+        // Add custom tab and fields to product data for Simple products
         add_filter('woocommerce_product_data_tabs', [$this, 'add_custom_product_tab']);
         add_action('woocommerce_product_data_panels', [$this, 'add_custom_product_fields']);
         
@@ -18,6 +18,7 @@ class DND_Speaking_WooCommerce {
         
         // Handle order completion to add lesson sessions
         add_action('woocommerce_order_status_completed', [$this, 'handle_order_completed']);
+        add_action('woocommerce_order_status_changed', [$this, 'handle_order_status_changed'], 10, 4);
         
         // Display lesson amount on product page
         add_action('woocommerce_single_product_summary', [$this, 'display_lesson_amount'], 25);
@@ -45,115 +46,42 @@ class DND_Speaking_WooCommerce {
      * Add custom tab to product data metabox
      */
     public function add_custom_product_tab($tabs) {
-        // Add a new "Main" tab for DND Speaking products
-        $tabs['dnd_main'] = [
-            'label' => __('Main', 'dnd-speaking'),
-            'target' => 'dnd_main_product_data',
-            'class' => ['show_if_dnd_speaking'],
-            'priority' => 20,
+        // Add a new "DND Speaking" tab for all simple products
+        $tabs['dnd_speaking'] = [
+            'label' => __('DND Speaking', 'dnd-speaking'),
+            'target' => 'dnd_speaking_product_data',
+            'class' => ['show_if_simple'], // Show for simple products
+            'priority' => 21,
         ];
-        
-        // Hide Shipping tab for DND Speaking products
-        if (isset($tabs['shipping'])) {
-            $tabs['shipping']['class'][] = 'hide_if_dnd_speaking';
-        }
         
         return $tabs;
     }
 
     /**
-     * Add custom fields to the Main tab
+     * Add custom fields to the DND Speaking tab
      */
     public function add_custom_product_fields() {
         global $post;
         
-        echo '<div id="dnd_main_product_data" class="panel woocommerce_options_panel hidden">';
-        
-        echo '<div class="options_group pricing show_if_simple show_if_external show_if_dnd_speaking">';
-        
-        // Regular Price
-        woocommerce_wp_text_input([
-            'id' => '_regular_price',
-            'class' => 'wc_input_price short',
-            'label' => __('Regular price', 'woocommerce') . ' (' . get_woocommerce_currency_symbol() . ')',
-            'data_type' => 'price',
-        ]);
-        
-        // Sale Price - Remove validation
-        echo '<p class="form-field _sale_price_field">
-            <label for="_sale_price">' . __('Sale price', 'woocommerce') . ' (' . get_woocommerce_currency_symbol() . ')</label>
-            <input type="text" class="short wc_input_price" name="_sale_price" id="_sale_price" value="' . esc_attr(get_post_meta($post->ID, '_sale_price', true)) . '" placeholder="">
-        </p>';
-        
-        // Schedule link
-        echo '<p class="form-field">
-            <label>&nbsp;</label>
-            <a href="#" class="sale_schedule">' . __('Schedule', 'woocommerce') . '</a>
-        </p>';
-        
-        // Schedule Sale fields - hidden by default
-        $sale_price_dates_from = get_post_meta($post->ID, '_sale_price_dates_from', true);
-        $sale_price_dates_to = get_post_meta($post->ID, '_sale_price_dates_to', true);
-        
-        $sale_price_dates_from_timestamp = $sale_price_dates_from ? date_i18n('Y-m-d', $sale_price_dates_from) : '';
-        $sale_price_dates_to_timestamp = $sale_price_dates_to ? date_i18n('Y-m-d', $sale_price_dates_to) : '';
-        
-        $sale_schedule_set = $sale_price_dates_from || $sale_price_dates_to;
-        
-        echo '<p class="form-field sale_price_dates_fields' . ($sale_schedule_set ? '' : ' hidden') . '">
-            <label for="_sale_price_dates_from">' . esc_html__('Sale price dates', 'woocommerce') . '</label>
-            <input type="text" class="short" name="_sale_price_dates_from" id="_sale_price_dates_from" 
-                   value="' . esc_attr($sale_price_dates_from_timestamp) . '" 
-                   placeholder="' . esc_html(_x('From&hellip;', 'placeholder', 'woocommerce')) . ' YYYY-MM-DD" maxlength="10" pattern="[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])" />
-            <input type="text" class="short" name="_sale_price_dates_to" id="_sale_price_dates_to" 
-                   value="' . esc_attr($sale_price_dates_to_timestamp) . '" 
-                   placeholder="' . esc_html(_x('To&hellip;', 'placeholder', 'woocommerce')) . ' YYYY-MM-DD" maxlength="10" pattern="[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])" />
-            <a href="#" class="description cancel_sale_schedule">' . esc_html__('Cancel', 'woocommerce') . '</a>
-        </p>';
-        
-        echo '</div>';
+        echo '<div id="dnd_speaking_product_data" class="panel woocommerce_options_panel hidden">';
         
         echo '<div class="options_group">';
         
-        // Tax Status
-        woocommerce_wp_select([
-            'id' => '_tax_status',
-            'label' => __('Tax status', 'woocommerce'),
-            'options' => [
-                'taxable' => __('Taxable', 'woocommerce'),
-                'shipping' => __('Shipping only', 'woocommerce'),
-                'none' => __('None', 'woocommerce'),
-            ],
-            'desc_tip' => true,
-            'description' => __('Define whether or not the product is taxable.', 'dnd-speaking'),
-        ]);
-        
-        // Tax Class
-        $tax_classes = WC_Tax::get_tax_classes();
-        $tax_class_options = ['' => __('Standard', 'woocommerce')];
-        
-        if ($tax_classes) {
-            foreach ($tax_classes as $class) {
-                $tax_class_options[sanitize_title($class)] = $class;
-            }
-        }
-        
-        woocommerce_wp_select([
-            'id' => '_tax_class',
-            'label' => __('Tax class', 'woocommerce'),
-            'options' => $tax_class_options,
-            'desc_tip' => true,
-            'description' => __('Choose a tax class for this product.', 'dnd-speaking'),
+        // Checkbox to enable DND Speaking features
+        woocommerce_wp_checkbox([
+            'id' => '_is_dnd_speaking',
+            'label' => __('DND Speaking Product', 'dnd-speaking'),
+            'description' => __('Check this box if this is a DND Speaking lesson package.', 'dnd-speaking'),
         ]);
         
         echo '</div>';
         
-        echo '<div class="options_group">';
+        echo '<div class="options_group dnd_speaking_fields">';
         
         // Custom Amount field - Number of lesson sessions
         woocommerce_wp_text_input([
             'id' => '_dnd_lesson_amount',
-            'label' => __('Amount (Lesson Sessions)', 'dnd-speaking'),
+            'label' => __('Lesson Sessions', 'dnd-speaking'),
             'desc_tip' => true,
             'description' => __('Enter the number of lesson sessions included with this product.', 'dnd-speaking'),
             'type' => 'number',
@@ -167,70 +95,25 @@ class DND_Speaking_WooCommerce {
         
         echo '</div>';
         
-        // Add JavaScript to show/hide tabs based on product type
+        // Add JavaScript to show/hide fields based on checkbox
         ?>
         <script type="text/javascript">
             jQuery(document).ready(function($) {
-                function toggleDNDSpeakingTabs() {
-                    var product_type = $('#product-type').val();
-                    
-                    if (product_type === 'dnd_speaking') {
-                        // Hide shipping tab for DND Speaking
-                        $('.shipping_tab').hide();
-                        // Show the Main tab content
-                        $('#dnd_main_product_data').show();
+                // Show/hide lesson amount field based on checkbox
+                function toggleDNDFields() {
+                    if ($('#_is_dnd_speaking').is(':checked')) {
+                        $('.dnd_speaking_fields').show();
                     } else {
-                        // Show shipping tab for other product types
-                        $('.shipping_tab').show();
-                        // Hide the Main tab content
-                        $('#dnd_main_product_data').hide();
+                        $('.dnd_speaking_fields').hide();
                     }
                 }
                 
                 // Run on page load
-                toggleDNDSpeakingTabs();
+                toggleDNDFields();
                 
-                // Run when product type changes
-                $('#product-type').on('change', function() {
-                    toggleDNDSpeakingTabs();
-                });
-                
-                // Handle tab clicks - show/hide panels properly
-                $('.product_data_tabs').on('click', 'li', function() {
-                    var target = $(this).find('a').attr('href');
-                    if (target === '#dnd_main_product_data') {
-                        $('.woocommerce_options_panel').hide();
-                        $('#dnd_main_product_data').show();
-                        $('.product_data_tabs li').removeClass('active');
-                        $(this).addClass('active');
-                    }
-                });
-                
-                // Initialize datepicker for sale schedule fields in DND Main tab
-                $('#dnd_main_product_data #_sale_price_dates_from, #dnd_main_product_data #_sale_price_dates_to').datepicker({
-                    dateFormat: 'yy-mm-dd',
-                    numberOfMonths: 1,
-                    showButtonPanel: true,
-                    changeMonth: true,
-                    changeYear: true
-                });
-                
-                // Handle "Schedule" link click to show date fields
-                $('#dnd_main_product_data').on('click', '.sale_schedule', function(e) {
-                    e.preventDefault();
-                    var $sale_schedule_fields = $(this).closest('.options_group').find('.sale_price_dates_fields');
-                    $sale_schedule_fields.slideToggle();
-                    return false;
-                });
-                
-                // Handle cancel sale schedule
-                $('#dnd_main_product_data').on('click', '.cancel_sale_schedule', function(e) {
-                    e.preventDefault();
-                    var $this = $(this);
-                    $this.closest('.sale_price_dates_fields').slideUp();
-                    $('#dnd_main_product_data #_sale_price_dates_from').val('');
-                    $('#dnd_main_product_data #_sale_price_dates_to').val('');
-                    return false;
+                // Run when checkbox changes
+                $('#_is_dnd_speaking').on('change', function() {
+                    toggleDNDFields();
                 });
             });
         </script>
@@ -241,74 +124,40 @@ class DND_Speaking_WooCommerce {
      * Save custom product fields
      */
     public function save_custom_product_fields($post_id) {
-        // Get the product
-        $product = wc_get_product($post_id);
+        // Save the DND Speaking checkbox
+        $is_dnd_speaking = isset($_POST['_is_dnd_speaking']) ? 'yes' : 'no';
+        update_post_meta($post_id, '_is_dnd_speaking', $is_dnd_speaking);
         
-        if (!$product) {
-            return;
+        error_log("DND Speaking: Saving product {$post_id}, is_dnd_speaking: {$is_dnd_speaking}");
+        
+        // Only save lesson amount if this is marked as a DND Speaking product
+        if ($is_dnd_speaking === 'yes') {
+            if (isset($_POST['_dnd_lesson_amount'])) {
+                $lesson_amount = absint($_POST['_dnd_lesson_amount']);
+                update_post_meta($post_id, '_dnd_lesson_amount', $lesson_amount);
+                error_log("DND Speaking: Saved lesson amount {$lesson_amount} for product {$post_id}");
+            } else {
+                error_log("DND Speaking: _dnd_lesson_amount not found in POST data for product {$post_id}");
+            }
+        } else {
+            // Remove lesson amount if not a DND Speaking product
+            delete_post_meta($post_id, '_dnd_lesson_amount');
+            error_log("DND Speaking: Removed lesson amount for product {$post_id} (not a DND Speaking product)");
         }
         
-        // Only save if this is a DND Speaking product
-        if ($product->get_type() !== 'dnd_speaking') {
-            return;
-        }
-        
-        // Save regular price
-        if (isset($_POST['_regular_price'])) {
-            $regular_price = wc_format_decimal($_POST['_regular_price']);
-            update_post_meta($post_id, '_regular_price', $regular_price);
-            $product->set_regular_price($regular_price);
-        }
-        
-        // Save sale price
-        if (isset($_POST['_sale_price'])) {
-            $sale_price = wc_format_decimal($_POST['_sale_price']);
-            update_post_meta($post_id, '_sale_price', $sale_price);
-            $product->set_sale_price($sale_price);
-        }
-        
-        // Save sale price dates
-        if (isset($_POST['_sale_price_dates_from'])) {
-            $sale_price_dates_from = $_POST['_sale_price_dates_from'];
-            update_post_meta($post_id, '_sale_price_dates_from', $sale_price_dates_from ? strtotime($sale_price_dates_from) : '');
-            $product->set_date_on_sale_from($sale_price_dates_from);
-        }
-        
-        if (isset($_POST['_sale_price_dates_to'])) {
-            $sale_price_dates_to = $_POST['_sale_price_dates_to'];
-            update_post_meta($post_id, '_sale_price_dates_to', $sale_price_dates_to ? strtotime($sale_price_dates_to) : '');
-            $product->set_date_on_sale_to($sale_price_dates_to);
-        }
-        
-        // Save tax status
-        if (isset($_POST['_tax_status'])) {
-            update_post_meta($post_id, '_tax_status', sanitize_text_field($_POST['_tax_status']));
-            $product->set_tax_status(sanitize_text_field($_POST['_tax_status']));
-        }
-        
-        // Save tax class
-        if (isset($_POST['_tax_class'])) {
-            update_post_meta($post_id, '_tax_class', sanitize_text_field($_POST['_tax_class']));
-            $product->set_tax_class(sanitize_text_field($_POST['_tax_class']));
-        }
-        
-        // Save lesson amount
-        if (isset($_POST['_dnd_lesson_amount'])) {
-            $lesson_amount = absint($_POST['_dnd_lesson_amount']);
-            update_post_meta($post_id, '_dnd_lesson_amount', $lesson_amount);
-        }
-        
-        // Save the product
-        $product->save();
+        error_log("DND Speaking: Product {$post_id} saved successfully");
     }
 
     /**
      * Handle order completion - Add lesson sessions to user credits
      */
     public function handle_order_completed($order_id) {
+        error_log("DND Speaking: handle_order_completed called for order {$order_id}");
+        
         $order = wc_get_order($order_id);
         
         if (!$order) {
+            error_log("DND Speaking: Order {$order_id} not found");
             return;
         }
         
@@ -320,45 +169,89 @@ class DND_Speaking_WooCommerce {
             return;
         }
         
+        error_log("DND Speaking: Processing order {$order_id} for user {$user_id}");
+        
         // Check if credits have already been added for this order
         $credits_added = get_post_meta($order_id, '_dnd_credits_added', true);
         if ($credits_added) {
+            error_log("DND Speaking: Credits already added for order {$order_id}");
             return; // Credits already added
         }
+        
+        $total_credits_added = 0;
         
         // Loop through order items
         foreach ($order->get_items() as $item_id => $item) {
             $product_id = $item->get_product_id();
             $product = wc_get_product($product_id);
             
-            // Check if this is a DND Speaking product
-            if ($product && $product->get_type() === 'dnd_speaking') {
-                $lesson_amount = get_post_meta($product_id, '_dnd_lesson_amount', true);
+            error_log("DND Speaking: Processing item {$item_id}, product ID: {$product_id}");
+            
+            if (!$product) {
+                error_log("DND Speaking: Product not found for product ID {$product_id}");
+                continue;
+            }
+            
+            $product_type = $product->get_type();
+            $lesson_amount = get_post_meta($product_id, '_dnd_lesson_amount', true);
+            
+            error_log("DND Speaking: Product type: {$product_type}, Lesson amount meta: {$lesson_amount}");
+            
+            // Check if this is a DND Speaking product OR has lesson amount meta
+            // This handles both official DND Speaking products and products created before the product type existed
+            if ($product_type === 'dnd_speaking' || (!empty($lesson_amount) && $lesson_amount > 0)) {
                 $quantity = $item->get_quantity();
+                
+                error_log("DND Speaking: DND Speaking product found - Lesson amount: {$lesson_amount}, Quantity: {$quantity}");
                 
                 if ($lesson_amount && $quantity) {
                     $total_credits = (int)$lesson_amount * (int)$quantity;
+                    
+                    error_log("DND Speaking: Attempting to add {$total_credits} credits to user {$user_id}");
                     
                     // Add credits to user
                     $result = DND_Speaking_Helpers::add_user_credits($user_id, $total_credits);
                     
                     if ($result) {
-                        error_log("DND Speaking: Added {$total_credits} lesson sessions to user {$user_id} from order {$order_id}");
-                        
-                        // Add order note
-                        $order->add_order_note(
-                            sprintf(
-                                __('Added %d lesson session(s) to user account.', 'dnd-speaking'),
-                                $total_credits
-                            )
-                        );
+                        $total_credits_added += $total_credits;
+                        error_log("DND Speaking: Successfully added {$total_credits} lesson sessions to user {$user_id} from order {$order_id}");
+                    } else {
+                        error_log("DND Speaking: FAILED to add credits to user {$user_id}");
                     }
+                } else {
+                    error_log("DND Speaking: Missing lesson amount or quantity - Amount: {$lesson_amount}, Quantity: {$quantity}");
                 }
+            } else {
+                error_log("DND Speaking: Not a DND Speaking product and no lesson amount found, skipping");
             }
+        }
+        
+        if ($total_credits_added > 0) {
+            // Add order note
+            $order->add_order_note(
+                sprintf(
+                    __('Added %d lesson session(s) to user account.', 'dnd-speaking'),
+                    $total_credits_added
+                )
+            );
         }
         
         // Mark that credits have been added
         update_post_meta($order_id, '_dnd_credits_added', true);
+        error_log("DND Speaking: Finished processing order {$order_id}, total credits added: {$total_credits_added}");
+    }
+
+    /**
+     * Handle order status change - specifically for manual status changes by admin
+     */
+    public function handle_order_status_changed($order_id, $old_status, $new_status, $order) {
+        // Only process when status changes TO completed
+        if ($new_status !== 'completed') {
+            return;
+        }
+        
+        // Call the main handler
+        $this->handle_order_completed($order_id);
     }
 
     /**
@@ -367,10 +260,11 @@ class DND_Speaking_WooCommerce {
     public function display_lesson_amount() {
         global $product;
         
-        if ($product && $product->get_type() === 'dnd_speaking') {
+        if ($product) {
+            $is_dnd_speaking = get_post_meta($product->get_id(), '_is_dnd_speaking', true);
             $lesson_amount = get_post_meta($product->get_id(), '_dnd_lesson_amount', true);
             
-            if ($lesson_amount) {
+            if ($is_dnd_speaking === 'yes' && $lesson_amount) {
                 echo '<div class="dnd-lesson-amount">';
                 echo '<strong>' . __('Lesson Sessions:', 'dnd-speaking') . '</strong> ';
                 echo esc_html($lesson_amount);
@@ -383,9 +277,9 @@ class DND_Speaking_WooCommerce {
      * Add lesson amount to cart item data
      */
     public function add_cart_item_data($cart_item_data, $product_id) {
-        $product = wc_get_product($product_id);
+        $is_dnd_speaking = get_post_meta($product_id, '_is_dnd_speaking', true);
         
-        if ($product && $product->get_type() === 'dnd_speaking') {
+        if ($is_dnd_speaking === 'yes') {
             $lesson_amount = get_post_meta($product_id, '_dnd_lesson_amount', true);
             if ($lesson_amount) {
                 $cart_item_data['dnd_lesson_amount'] = $lesson_amount;
