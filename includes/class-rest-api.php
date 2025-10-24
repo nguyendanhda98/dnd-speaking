@@ -144,6 +144,7 @@ class DND_Speaking_REST_API {
             $page = intval($_POST['page']) ?: 1;
             $per_page = intval($_POST['per_page']) ?: 10;
             $status_filter = sanitize_text_field($_POST['filter']) ?: 'all';
+            $filter_day = sanitize_text_field($_POST['filter_day']) ?: '';
             $filter_month = sanitize_text_field($_POST['filter_month']) ?: '';
             $filter_year = sanitize_text_field($_POST['filter_year']) ?: '';
 
@@ -164,7 +165,7 @@ class DND_Speaking_REST_API {
             $where_clause = "s.teacher_id = %d";
             $query_params = [$user_id];
 
-            // Add time period filter (month and year)
+            // Add time period filter (day, month and year)
             if (!empty($filter_year)) {
                 $where_clause .= " AND YEAR(s.session_date) = %d";
                 $query_params[] = intval($filter_year);
@@ -172,6 +173,10 @@ class DND_Speaking_REST_API {
             if (!empty($filter_month)) {
                 $where_clause .= " AND MONTH(s.session_date) = %d";
                 $query_params[] = intval($filter_month);
+            }
+            if (!empty($filter_day)) {
+                $where_clause .= " AND DAY(s.session_date) = %d";
+                $query_params[] = intval($filter_day);
             }
 
             // Store base where clause for counting (without status filter)

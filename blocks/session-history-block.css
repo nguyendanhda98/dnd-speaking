@@ -40,8 +40,13 @@
     min-width: 120px;
 }
 
-.dnd-time-period-filters input[type="number"] {
-    width: 150px;
+.dnd-time-period-filters input[type="number"]#filter_day {
+    width: 80px;
+    min-width: 80px;
+}
+
+.dnd-time-period-filters input[type="number"]#filter_year {
+    width: 120px;
 }
 
 .dnd-btn-apply {

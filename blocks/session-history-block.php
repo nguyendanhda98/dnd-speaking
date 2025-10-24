@@ -71,21 +71,15 @@ class DND_Speaking_Session_History_Block {
 
         global $wpdb;
 
-        // Calculate total hours for completed sessions
-        $total_hours = $wpdb->get_var($wpdb->prepare(
-            "SELECT SUM(s.duration) / 60.0 FROM {$wpdb->prefix}dnd_speaking_sessions s WHERE s.teacher_id = %d AND s.status = 'completed'",
-            $user_id
-        )) ?: 0;
-
         $output = '<div class="dnd-session-history">';
-        $output .= '<h3>Session History</h3>';
+        $output .= '<h3>Teacher Session</h3>';
 
-        // Total hours at top
-        $output .= '<div class="dnd-total-hours">Tổng số giờ đã dạy: ' . number_format($total_hours, 1) . 'h</div>';
-
-        // Time period filters - Month and Year selection
+        // Time period filters - Day, Month and Year selection
         $output .= '<div class="dnd-time-period-filters">';
         $output .= '<label>Lọc theo thời gian:</label>';
+        
+        // Day input
+        $output .= '<input type="number" id="filter_day" name="filter_day" placeholder="Ngày" min="1" max="31" step="1" />';
         
         // Month selector
         $output .= '<select id="filter_month" name="filter_month">';
@@ -138,7 +132,7 @@ class DND_Speaking_Session_History_Block {
         $output .= '</div>';
 
         // Content will be loaded via AJAX
-        $output .= '<div class="dnd-session-history-list" id="dnd-session-history-list" data-filter="all" data-filter-month="" data-filter-year="" data-per-page="10" data-page="1">';
+        $output .= '<div class="dnd-session-history-list" id="dnd-session-history-list" data-filter="all" data-filter-day="" data-filter-month="" data-filter-year="" data-per-page="10" data-page="1">';
         $output .= '<div class="dnd-loading">Loading...</div>';
         $output .= '</div>';
 

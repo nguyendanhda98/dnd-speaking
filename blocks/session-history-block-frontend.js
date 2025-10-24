@@ -11,6 +11,7 @@ jQuery(document).ready(function($) {
     }
 
     let currentFilter = $historyList.data('filter') || 'all';
+    let currentFilterDay = $historyList.data('filter-day') || '';
     let currentFilterMonth = $historyList.data('filter-month') || '';
     let currentFilterYear = $historyList.data('filter-year') || '';
     let currentPerPage = $historyList.data('per-page') || 10;
@@ -18,6 +19,7 @@ jQuery(document).ready(function($) {
 
     // Set initial select values
     $('#session_history_per_page').val(currentPerPage);
+    $('#filter_day').val(currentFilterDay);
     $('#filter_month').val(currentFilterMonth);
     $('#filter_year').val(currentFilterYear);
 
@@ -43,6 +45,7 @@ jQuery(document).ready(function($) {
 
     // Handle apply time filter button
     $historyBlock.on('click', '#apply_time_filter', function() {
+        currentFilterDay = $('#filter_day').val();
         currentFilterMonth = $('#filter_month').val();
         currentFilterYear = $('#filter_year').val();
         currentPage = 1; // Reset to first page
@@ -68,6 +71,7 @@ jQuery(document).ready(function($) {
             data: {
                 action: 'get_session_history',
                 filter: currentFilter,
+                filter_day: currentFilterDay,
                 filter_month: currentFilterMonth,
                 filter_year: currentFilterYear,
                 per_page: currentPerPage,

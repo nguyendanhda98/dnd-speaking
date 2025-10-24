@@ -79,17 +79,8 @@ class DND_Speaking_Student_Sessions_Block {
 
         global $wpdb;
 
-        // Calculate total hours for completed sessions
-        $total_hours = $wpdb->get_var($wpdb->prepare(
-            "SELECT SUM(s.duration) / 60.0 FROM {$wpdb->prefix}dnd_speaking_sessions s WHERE s.student_id = %d AND s.status = 'completed'",
-            $user_id
-        )) ?: 0;
-
         $output = '<div class="dnd-student-sessions-block">';
-        $output .= '<h3>Student Sessions</h3>';
-
-        // Total hours at top
-        $output .= '<div class="dnd-total-hours">Số giờ đã học: ' . number_format($total_hours, 1) . 'h</div>';
+        $output .= '<h3>Student Session</h3>';
 
         // Filters
         $output .= '<div class="dnd-sessions-filters">';
