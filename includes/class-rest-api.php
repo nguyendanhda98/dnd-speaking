@@ -415,9 +415,6 @@ class DND_Speaking_REST_API {
         $teacher_id = intval($request->get_param('teacher_id'));
         $discord_channel = sanitize_text_field($request->get_param('discord_channel'));
 
-        // Set timezone to Vietnam
-        date_default_timezone_set('Asia/Ho_Chi_Minh');
-
         // Check credits
         if (!DND_Speaking_Helpers::deduct_user_credits($student_id)) {
             return new WP_Error('insufficient_credits', 'Not enough credits', ['status' => 400]);
@@ -626,13 +623,13 @@ class DND_Speaking_REST_API {
         $teacher_id = intval($request->get_param('teacher_id'));
         $start_time = sanitize_text_field($request->get_param('start_time'));
 
-        // Set timezone to Vietnam
-        date_default_timezone_set('Asia/Ho_Chi_Minh');
+        // Use WordPress timezone functions instead of date_default_timezone_set
+        // Get current timestamp in site's timezone
+        $now = current_time('timestamp');
         
         // Validate start_time is in the future and within 1 week
         $start_timestamp = strtotime($start_time);
-        $now = time();
-        $one_week_later = strtotime('+7 days');
+        $one_week_later = strtotime('+7 days', $now);
 
         if ($start_timestamp <= $now) {
             return new WP_Error('invalid_time', 'Cannot book sessions in the past', ['status' => 400]);
@@ -703,6 +700,9 @@ class DND_Speaking_REST_API {
         global $wpdb;
         $table = $wpdb->prefix . 'dnd_speaking_sessions';
         
+        // Convert start_time to UTC for database comparison
+        $start_time_utc_check = get_gmt_from_date($start_time);
+        
         // Start transaction
         $wpdb->query('START TRANSACTION');
         
@@ -714,7 +714,7 @@ class DND_Speaking_REST_API {
                  AND start_time = %s 
                  AND status IN ('pending', 'confirmed', 'active')
                  FOR UPDATE",
-                $teacher_id, $start_time
+                $teacher_id, $start_time_utc_check
             ));
 
             if ($existing > 0) {
@@ -728,11 +728,15 @@ class DND_Speaking_REST_API {
                 return new WP_Error('insufficient_credits', 'Không đủ buổi học', ['status' => 400]);
             }
 
+            // Convert start_time from local timezone to UTC for database storage
+            // WordPress stores all times in UTC in database
+            $start_time_utc = get_gmt_from_date($start_time);
+
             // Book the session
             $insert_data = [
                 'student_id' => $student_id,
                 'teacher_id' => $teacher_id,
-                'start_time' => $start_time,
+                'start_time' => $start_time_utc,
                 'status' => 'pending'
             ];
             
@@ -768,9 +772,8 @@ class DND_Speaking_REST_API {
     public function get_teacher_availability($request) {
         $teacher_id = intval($request->get_param('teacher_id'));
         
-        // Set timezone to Vietnam
-        date_default_timezone_set('Asia/Ho_Chi_Minh');
-        $now = time();
+        // Use WordPress timezone functions
+        $now = current_time('timestamp');
         $start_date = date('Y-m-d', $now);
         
         // Calculate end date: only show up to next Thursday
@@ -837,17 +840,24 @@ class DND_Speaking_REST_API {
         // Get booked sessions for this teacher in the next week
         global $wpdb;
         $table = $wpdb->prefix . 'dnd_speaking_sessions';
+        
+        // Convert local dates to UTC for database query
+        $start_date_utc = get_gmt_from_date($start_date . ' 00:00:00');
+        $end_date_utc = get_gmt_from_date($end_date . ' 23:59:59');
+        
         $booked_sessions = $wpdb->get_results($wpdb->prepare(
             "SELECT start_time FROM $table 
              WHERE teacher_id = %d 
              AND status IN ('pending', 'confirmed', 'active') 
-             AND DATE(start_time) BETWEEN %s AND %s",
-            $teacher_id, $start_date, $end_date
+             AND start_time BETWEEN %s AND %s",
+            $teacher_id, $start_date_utc, $end_date_utc
         ));
 
         $booked_times = [];
         foreach ($booked_sessions as $session) {
-            $booked_times[] = date('Y-m-d H:i:s', strtotime($session->start_time));
+            // Convert UTC time from database to local time for comparison
+            $local_time = get_date_from_gmt($session->start_time);
+            $booked_times[] = $local_time;
         }
 
         // Generate available slots: 9 AM to 5 PM, 30 minute slots, starting from current time
@@ -872,6 +882,11 @@ class DND_Speaking_REST_API {
                     
                     $day_start_time = strtotime(date('Y-m-d', $current_date) . " {$time_slot['start']}:00");
                     $day_end_time = strtotime(date('Y-m-d', $current_date) . " {$time_slot['end']}:00");
+                    
+                    // Special case: if end time is 00:00 (midnight), it means next day
+                    if ($time_slot['end'] === '00:00') {
+                        $day_end_time = strtotime('+1 day', strtotime(date('Y-m-d', $current_date) . " 00:00:00"));
+                    }
                 
                 // Sessions can be booked up to 30 minutes before end time
                 $bookable_end_time = strtotime('-30 minutes', $day_end_time);
@@ -2524,58 +2539,6 @@ class DND_Speaking_REST_API {
             'room_link' => $room_link,
             'message' => 'Phiên học đã được bắt đầu thành công!'
         ], 200);
-    }
-
-    /**
-     * Auto-cancel pending sessions that start within 5 minutes and haven't been accepted
-     * This function is called by WP Cron every minute
-     */
-    public static function auto_cancel_unaccepted_sessions() {
-        global $wpdb;
-        
-        // Set timezone to Vietnam
-        date_default_timezone_set('Asia/Ho_Chi_Minh');
-        
-        $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
-        
-        // Find all pending sessions that start within 5 minutes
-        $five_minutes_from_now = date('Y-m-d H:i:s', strtotime('+5 minutes'));
-        $now = date('Y-m-d H:i:s');
-        
-        $pending_sessions = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $sessions_table 
-             WHERE status = 'pending' 
-             AND start_time <= %s 
-             AND start_time > %s",
-            $five_minutes_from_now,
-            $now
-        ));
-        
-        foreach ($pending_sessions as $session) {
-            // Cancel the session
-            $wpdb->update(
-                $sessions_table,
-                [
-                    'status' => 'cancelled',
-                    'cancelled_at' => current_time('mysql'),
-                    'cancelled_by' => 0 // 0 means auto-cancelled by system
-                ],
-                ['id' => $session->id],
-                ['%s', '%s', '%d'],
-                ['%d']
-            );
-            
-            // Refund the student's credit
-            if (DND_Speaking_Helpers::add_user_credits($session->student_id, 1)) {
-                error_log("DND Speaking Auto-Cancel: Refunded 1 credit to student ID {$session->student_id} for session ID {$session->id}");
-            }
-            
-            error_log("DND Speaking Auto-Cancel: Cancelled session ID {$session->id} (teacher didn't accept within time limit)");
-        }
-        
-        if (count($pending_sessions) > 0) {
-            error_log("DND Speaking Auto-Cancel: Processed " . count($pending_sessions) . " pending sessions");
-        }
     }
 }
 

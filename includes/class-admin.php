@@ -848,14 +848,19 @@ class DND_Speaking_Admin {
     }
 
     public function handle_teacher_request() {
+        error_log("=== HANDLE TEACHER REQUEST CALLED ===");
+        
         // Check nonce for security
         if (!wp_verify_nonce($_POST['nonce'], 'teacher_requests_nonce')) {
+            error_log("Nonce check failed");
             wp_send_json_error('Security check failed');
         }
 
         $session_id = intval($_POST['session_id']);
         $action = sanitize_text_field($_POST['request_action']);
         $teacher_id = get_current_user_id();
+        
+        error_log("Session ID: {$session_id}, Action: {$action}, Teacher ID: {$teacher_id}");
 
         // Validate action
         if (!in_array($action, ['accept', 'decline'])) {
@@ -872,7 +877,72 @@ class DND_Speaking_Admin {
         ));
 
         if (!$session) {
+            error_log("Session not found or already processed");
             wp_send_json_error('Session not found or already processed');
+        }
+        
+        error_log("Session found: " . print_r($session, true));
+
+        // Check if session time has passed or is within 5 minutes
+        if (!empty($session->start_time)) {
+            // Get current time in WordPress timezone (should be Asia/Ho_Chi_Minh)
+            $current_timestamp = current_time('timestamp');
+            
+            // Convert session start_time from database (UTC) to timestamp
+            $session_timestamp = strtotime(get_date_from_gmt($session->start_time));
+            
+            $time_until_session = $session_timestamp - $current_timestamp;
+            
+            // Debug logging with more details
+            $current_time_formatted = date('Y-m-d H:i:s', $current_timestamp);
+            $session_time_formatted = date('Y-m-d H:i:s', $session_timestamp);
+            $utc_time = gmdate('Y-m-d H:i:s');
+            error_log("=== TIME CHECK DEBUG ===");
+            error_log("UTC Now: {$utc_time}");
+            error_log("Current time (local): {$current_time_formatted}");
+            error_log("Session start_time (UTC from DB): {$session->start_time}");
+            error_log("Session start_time (converted to local): {$session_time_formatted}");
+            error_log("Time difference (seconds): {$time_until_session}");
+            error_log("Time difference (minutes): " . ($time_until_session / 60));
+            error_log("Threshold: 300 seconds (5 minutes)");
+            error_log("Will cancel?: " . ($time_until_session <= 300 ? 'YES' : 'NO'));
+            
+            // If session is in the past or within 5 minutes (300 seconds)
+            if ($time_until_session <= 300) {
+                error_log("CANCELLING SESSION - Time until session ({$time_until_session}s) is <= 300s");
+                
+                // Auto-cancel and refund
+                $wpdb->update(
+                    $sessions_table,
+                    [
+                        'status' => 'cancelled',
+                        'cancelled_at' => current_time('mysql'),
+                        'cancelled_by' => 0 // 0 means auto-cancelled by system
+                    ],
+                    ['id' => $session_id],
+                    ['%s', '%s', '%d'],
+                    ['%d']
+                );
+                
+                // Refund the student's credit
+                $student_id = $session->student_id;
+                DND_Speaking_Helpers::add_user_credits($student_id, 1);
+                
+                // Determine error message
+                if ($time_until_session < 0) {
+                    $message = 'Không thể xác nhận vì buổi học đã quá giờ. Hệ thống đã tự động hủy và hoàn lại buổi học cho học viên.';
+                } else {
+                    $message = 'Không thể xác nhận vì sắp đến giờ học (còn dưới 5 phút). Hệ thống đã tự động hủy và hoàn lại buổi học cho học viên.';
+                }
+                
+                error_log("DND Speaking: Auto-cancelled session {$session_id}");
+                
+                wp_send_json_error($message);
+            } else {
+                error_log("NOT CANCELLING - Time until session ({$time_until_session}s) is > 300s");
+            }
+        } else {
+            error_log("No start_time found for session");
         }
 
         // Update session status
@@ -1008,7 +1078,16 @@ class DND_Speaking_Admin {
                             }
 
                             // Validate that start is before end
-                            if (strtotime($start_time) >= strtotime($end_time)) {
+                            // Special case: if end_time is 00:00, it means midnight of next day
+                            $start_timestamp = strtotime($start_time);
+                            $end_timestamp = strtotime($end_time);
+                            
+                            // If end time is 00:00 (midnight), treat it as next day (add 24 hours)
+                            if ($end_time === '00:00') {
+                                $end_timestamp = strtotime('+1 day', $end_timestamp);
+                            }
+                            
+                            if ($start_timestamp >= $end_timestamp) {
                                 wp_send_json_error('Start time must be before end time');
                             }
 

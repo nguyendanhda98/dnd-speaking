@@ -29,20 +29,6 @@ require_once plugin_dir_path(__FILE__) . 'blocks/discord-connect-block.php';
 register_activation_hook(__FILE__, ['DND_Speaking_Activator', 'activate']);
 register_deactivation_hook(__FILE__, ['DND_Speaking_Deactivator', 'deactivate']);
 
-// Add custom cron schedule for every minute
-add_filter('cron_schedules', function($schedules) {
-    if (!isset($schedules['every_minute'])) {
-        $schedules['every_minute'] = [
-            'interval' => 60,
-            'display'  => __('Every Minute')
-        ];
-    }
-    return $schedules;
-});
-
-// Hook up the cron job to auto-cancel unaccepted sessions
-add_action('dnd_speaking_auto_cancel_sessions', ['DND_Speaking_REST_API', 'auto_cancel_unaccepted_sessions']);
-
 // Initialize main plugin
 add_action('plugins_loaded', function() {
     // Update database if needed
