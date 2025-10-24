@@ -17,6 +17,50 @@
     text-align: center;
 }
 
+.dnd-time-period-filters {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.dnd-time-period-filters label {
+    font-weight: 500;
+    color: #333;
+}
+
+.dnd-time-period-filters select,
+.dnd-time-period-filters input[type="number"] {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 14px;
+    min-width: 120px;
+}
+
+.dnd-time-period-filters input[type="number"] {
+    width: 150px;
+}
+
+.dnd-btn-apply {
+    padding: 6px 16px;
+    border: 1px solid #007cba;
+    background: #007cba;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.dnd-btn-apply:hover {
+    background: #005a87;
+    border-color: #005a87;
+}
+
 .dnd-sessions-filters {
     display: flex;
     gap: 10px;

@@ -144,6 +144,8 @@ class DND_Speaking_REST_API {
             $page = intval($_POST['page']) ?: 1;
             $per_page = intval($_POST['per_page']) ?: 10;
             $status_filter = sanitize_text_field($_POST['filter']) ?: 'all';
+            $filter_month = sanitize_text_field($_POST['filter_month']) ?: '';
+            $filter_year = sanitize_text_field($_POST['filter_year']) ?: '';
 
             $allowed_per_page = [1, 3, 5, 10];
             if (!in_array($per_page, $allowed_per_page)) {
@@ -162,6 +164,21 @@ class DND_Speaking_REST_API {
             $where_clause = "s.teacher_id = %d";
             $query_params = [$user_id];
 
+            // Add time period filter (month and year)
+            if (!empty($filter_year)) {
+                $where_clause .= " AND YEAR(s.session_date) = %d";
+                $query_params[] = intval($filter_year);
+            }
+            if (!empty($filter_month)) {
+                $where_clause .= " AND MONTH(s.session_date) = %d";
+                $query_params[] = intval($filter_month);
+            }
+
+            // Store base where clause for counting (without status filter)
+            $base_where_clause = $where_clause;
+            $base_query_params = $query_params;
+
+            // Add status filter
             switch ($status_filter) {
                 case 'pending':
                     $where_clause .= " AND s.status = 'pending'";
@@ -292,6 +309,39 @@ class DND_Speaking_REST_API {
                 }
             }
 
+            // Calculate counts for each status filter using the base where clause (time filter only)
+            $filter_counts = [];
+            
+            // Count all
+            $filter_counts['all'] = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $sessions_table s WHERE $base_where_clause",
+                $base_query_params
+            ));
+            
+            // Count pending
+            $filter_counts['pending'] = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $sessions_table s WHERE $base_where_clause AND s.status = 'pending'",
+                $base_query_params
+            ));
+            
+            // Count confirmed (includes confirmed and in_progress)
+            $filter_counts['confirmed'] = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $sessions_table s WHERE $base_where_clause AND s.status IN ('confirmed', 'in_progress')",
+                $base_query_params
+            ));
+            
+            // Count completed
+            $filter_counts['completed'] = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $sessions_table s WHERE $base_where_clause AND s.status = 'completed'",
+                $base_query_params
+            ));
+            
+            // Count cancelled
+            $filter_counts['cancelled'] = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $sessions_table s WHERE $base_where_clause AND s.status = 'cancelled'",
+                $base_query_params
+            ));
+
             wp_send_json([
                 'success' => true,
                 'html' => $output,
@@ -299,7 +349,8 @@ class DND_Speaking_REST_API {
                     'current_page' => $page,
                     'total_pages' => $total_pages,
                     'total_sessions' => $total_sessions
-                ]
+                ],
+                'filter_counts' => $filter_counts
             ]);
         error_log('AJAX Student Session History - Response sent successfully for user ' . get_current_user_id());
         } catch (Exception $e) {

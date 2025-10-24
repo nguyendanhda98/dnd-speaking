@@ -11,11 +11,15 @@ jQuery(document).ready(function($) {
     }
 
     let currentFilter = $historyList.data('filter') || 'all';
+    let currentFilterMonth = $historyList.data('filter-month') || '';
+    let currentFilterYear = $historyList.data('filter-year') || '';
     let currentPerPage = $historyList.data('per-page') || 10;
     let currentPage = $historyList.data('page') || 1;
 
-    // Set initial select value
+    // Set initial select values
     $('#session_history_per_page').val(currentPerPage);
+    $('#filter_month').val(currentFilterMonth);
+    $('#filter_year').val(currentFilterYear);
 
     // Initial load
     loadSessionHistory();
@@ -33,6 +37,14 @@ jQuery(document).ready(function($) {
     // Handle per page change
     $historyBlock.on('change', '#session_history_per_page', function() {
         currentPerPage = parseInt($(this).val());
+        currentPage = 1; // Reset to first page
+        loadSessionHistory();
+    });
+
+    // Handle apply time filter button
+    $historyBlock.on('click', '#apply_time_filter', function() {
+        currentFilterMonth = $('#filter_month').val();
+        currentFilterYear = $('#filter_year').val();
         currentPage = 1; // Reset to first page
         loadSessionHistory();
     });
@@ -56,6 +68,8 @@ jQuery(document).ready(function($) {
             data: {
                 action: 'get_session_history',
                 filter: currentFilter,
+                filter_month: currentFilterMonth,
+                filter_year: currentFilterYear,
                 per_page: currentPerPage,
                 page: currentPage,
                 nonce: dnd_session_history_data.nonce
@@ -66,6 +80,11 @@ jQuery(document).ready(function($) {
                     console.log('Total sessions:', response.pagination.total_sessions, 'Total pages:', response.pagination.total_pages);
                     $historyList.html(response.html);
                     updateFilterButtons();
+                    
+                    // Update filter button counts if provided
+                    if (response.filter_counts) {
+                        updateFilterCounts(response.filter_counts);
+                    }
                 } else {
                     $historyList.html('<p>Có lỗi xảy ra khi tải dữ liệu.</p>');
                 }
@@ -80,6 +99,17 @@ jQuery(document).ready(function($) {
     function updateFilterButtons() {
         $('.dnd-filter-btn').removeClass('active');
         $('.dnd-filter-btn[data-filter="' + currentFilter + '"]').addClass('active');
+    }
+
+    function updateFilterCounts(counts) {
+        // Update the count display in each filter button
+        $('.dnd-filter-btn').each(function() {
+            const filter = $(this).data('filter');
+            if (counts[filter] !== undefined) {
+                const label = $(this).text().replace(/\(\d+\)/, '').trim();
+                $(this).text(label + ' (' + counts[filter] + ')');
+            }
+        });
     }
 
     // Handle action buttons

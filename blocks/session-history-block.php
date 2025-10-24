@@ -83,6 +83,32 @@ class DND_Speaking_Session_History_Block {
         // Total hours at top
         $output .= '<div class="dnd-total-hours">Tổng số giờ đã dạy: ' . number_format($total_hours, 1) . 'h</div>';
 
+        // Time period filters - Month and Year selection
+        $output .= '<div class="dnd-time-period-filters">';
+        $output .= '<label>Lọc theo thời gian:</label>';
+        
+        // Month selector
+        $output .= '<select id="filter_month" name="filter_month">';
+        $output .= '<option value="">Tất cả tháng</option>';
+        $months = [
+            '01' => 'Tháng 1', '02' => 'Tháng 2', '03' => 'Tháng 3',
+            '04' => 'Tháng 4', '05' => 'Tháng 5', '06' => 'Tháng 6',
+            '07' => 'Tháng 7', '08' => 'Tháng 8', '09' => 'Tháng 9',
+            '10' => 'Tháng 10', '11' => 'Tháng 11', '12' => 'Tháng 12'
+        ];
+        foreach ($months as $value => $label) {
+            $output .= '<option value="' . $value . '">' . $label . '</option>';
+        }
+        $output .= '</select>';
+        
+        // Year input
+        $current_year = date('Y');
+        $output .= '<input type="number" id="filter_year" name="filter_year" placeholder="Năm (VD: ' . $current_year . ')" min="2000" max="2100" step="1" />';
+        
+        // Apply button
+        $output .= '<button type="button" id="apply_time_filter" class="dnd-btn-apply">Áp dụng</button>';
+        $output .= '</div>';
+
         // Filters
         $output .= '<div class="dnd-sessions-filters">';
         $filters = [
@@ -112,7 +138,7 @@ class DND_Speaking_Session_History_Block {
         $output .= '</div>';
 
         // Content will be loaded via AJAX
-        $output .= '<div class="dnd-session-history-list" id="dnd-session-history-list" data-filter="all" data-per-page="10" data-page="1">';
+        $output .= '<div class="dnd-session-history-list" id="dnd-session-history-list" data-filter="all" data-filter-month="" data-filter-year="" data-per-page="10" data-page="1">';
         $output .= '<div class="dnd-loading">Loading...</div>';
         $output .= '</div>';
 
