@@ -699,44 +699,70 @@ class DND_Speaking_REST_API {
             return new WP_Error('invalid_slot', 'This time slot is not available for booking', ['status' => 400]);
         }
 
-        // Check if slot is still available
+        // Use transaction to prevent race condition when 2 students book the same slot simultaneously
         global $wpdb;
         $table = $wpdb->prefix . 'dnd_speaking_sessions';
-        $existing = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM $table 
-             WHERE teacher_id = %d 
-             AND start_time = %s 
-             AND status IN ('pending', 'confirmed', 'active')",
-            $teacher_id, $start_time
-        ));
-
-        if ($existing > 0) {
-            return new WP_Error('slot_taken', 'This time slot is no longer available', ['status' => 400]);
-        }
-
-        // Deduct credits immediately when booking
-        if (!DND_Speaking_Helpers::deduct_user_credits($student_id, 1)) {
-            return new WP_Error('insufficient_credits', 'Không đủ buổi học', ['status' => 400]);
-        }
-
-        // Book the session
-        $insert_data = [
-            'student_id' => $student_id,
-            'teacher_id' => $teacher_id,
-            'start_time' => $start_time,
-            'status' => 'pending'
-        ];
         
-        // Check if session_date/session_time columns exist
-        $columns = $wpdb->get_col("DESCRIBE $table");
-        if (in_array('session_date', $columns) && in_array('session_time', $columns)) {
-            $insert_data['session_date'] = date('Y-m-d', $start_timestamp);
-            $insert_data['session_time'] = date('H:i:s', $start_timestamp);
-        }
+        // Start transaction
+        $wpdb->query('START TRANSACTION');
         
-        $wpdb->insert($table, $insert_data);
+        try {
+            // Lock and check if slot is still available using FOR UPDATE to prevent concurrent bookings
+            $existing = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $table 
+                 WHERE teacher_id = %d 
+                 AND start_time = %s 
+                 AND status IN ('pending', 'confirmed', 'active')
+                 FOR UPDATE",
+                $teacher_id, $start_time
+            ));
 
-        return ['success' => true, 'session_id' => $wpdb->insert_id];
+            if ($existing > 0) {
+                $wpdb->query('ROLLBACK');
+                return new WP_Error('slot_taken', 'Slot này đã được đặt bởi học viên khác. Vui lòng chọn slot khác.', ['status' => 400]);
+            }
+
+            // Deduct credits immediately when booking
+            if (!DND_Speaking_Helpers::deduct_user_credits($student_id, 1)) {
+                $wpdb->query('ROLLBACK');
+                return new WP_Error('insufficient_credits', 'Không đủ buổi học', ['status' => 400]);
+            }
+
+            // Book the session
+            $insert_data = [
+                'student_id' => $student_id,
+                'teacher_id' => $teacher_id,
+                'start_time' => $start_time,
+                'status' => 'pending'
+            ];
+            
+            // Check if session_date/session_time columns exist
+            $columns = $wpdb->get_col("DESCRIBE $table");
+            if (in_array('session_date', $columns) && in_array('session_time', $columns)) {
+                $insert_data['session_date'] = date('Y-m-d', $start_timestamp);
+                $insert_data['session_time'] = date('H:i:s', $start_timestamp);
+            }
+            
+            $result = $wpdb->insert($table, $insert_data);
+            
+            if ($result === false) {
+                $wpdb->query('ROLLBACK');
+                return new WP_Error('booking_failed', 'Không thể đặt lịch. Vui lòng thử lại.', ['status' => 500]);
+            }
+            
+            $session_id = $wpdb->insert_id;
+            
+            // Commit transaction
+            $wpdb->query('COMMIT');
+            
+            return ['success' => true, 'session_id' => $session_id];
+            
+        } catch (Exception $e) {
+            // Rollback on any error
+            $wpdb->query('ROLLBACK');
+            error_log('Booking error: ' . $e->getMessage());
+            return new WP_Error('booking_error', 'Có lỗi xảy ra khi đặt lịch. Vui lòng thử lại.', ['status' => 500]);
+        }
     }
 
     public function get_teacher_availability($request) {

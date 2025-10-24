@@ -52,31 +52,23 @@ class DND_Speaking_Helpers {
     public static function deduct_user_credits($user_id, $amount = 1) {
         global $wpdb;
         $table = $wpdb->prefix . 'dnd_speaking_credits';
-        $current_credits = self::get_user_credits($user_id);
         
-        if ($current_credits < $amount) {
+        // Use atomic UPDATE with WHERE condition to prevent race condition
+        // This will only update if credits are sufficient
+        $result = $wpdb->query($wpdb->prepare(
+            "UPDATE $table SET credits = credits - %d WHERE user_id = %d AND credits >= %d",
+            $amount, $user_id, $amount
+        ));
+        
+        // Check if any row was updated
+        if ($result === false || $wpdb->rows_affected === 0) {
+            $current_credits = self::get_user_credits($user_id);
             error_log("CREDIT DEDUCTION FAILED - User {$user_id} has {$current_credits} credits, needs {$amount}");
             return false;
         }
         
-        $new_credits = $current_credits - $amount;
-        
-        // Check if user exists in credits table
-        $exists = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE user_id = %d", $user_id));
-        
-        if ($exists > 0) {
-            $result = $wpdb->update($table, ['credits' => $new_credits], ['user_id' => $user_id], ['%d'], ['%d']);
-        } else {
-            // User doesn't exist, insert with 0 credits (shouldn't happen but handle it)
-            $result = $wpdb->insert($table, ['user_id' => $user_id, 'credits' => 0], ['%d', '%d']);
-            error_log("CREDIT DEDUCTION - User {$user_id} not found in credits table, created with 0 credits");
-            return false;
-        }
-        
-        if ($result === false) {
-            error_log("CREDIT DEDUCTION FAILED - Database error for user {$user_id}: " . $wpdb->last_error);
-            return false;
-        }
+        // Get new balance for logging
+        $new_credits = self::get_user_credits($user_id);
         
         // Log the deduction
         self::log_action($user_id, 'credit_deducted', "Deducted {$amount} credit(s). Balance: {$new_credits}");
