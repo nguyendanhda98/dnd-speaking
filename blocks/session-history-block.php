@@ -79,25 +79,13 @@ class DND_Speaking_Session_History_Block {
         $output .= '<label>Lọc theo thời gian:</label>';
         
         // Day input
-        $output .= '<input type="number" id="filter_day" name="filter_day" placeholder="Ngày" min="1" max="31" step="1" />';
+        $output .= '<input type="number" id="filter_day" name="filter_day" placeholder="Ngày (1-31)" min="1" max="31" step="1" />';
         
-        // Month selector
-        $output .= '<select id="filter_month" name="filter_month">';
-        $output .= '<option value="">Tất cả tháng</option>';
-        $months = [
-            '01' => 'Tháng 1', '02' => 'Tháng 2', '03' => 'Tháng 3',
-            '04' => 'Tháng 4', '05' => 'Tháng 5', '06' => 'Tháng 6',
-            '07' => 'Tháng 7', '08' => 'Tháng 8', '09' => 'Tháng 9',
-            '10' => 'Tháng 10', '11' => 'Tháng 11', '12' => 'Tháng 12'
-        ];
-        foreach ($months as $value => $label) {
-            $output .= '<option value="' . $value . '">' . $label . '</option>';
-        }
-        $output .= '</select>';
+        // Month input
+        $output .= '<input type="number" id="filter_month" name="filter_month" placeholder="Tháng (1-12)" min="1" max="12" step="1" />';
         
         // Year input
-        $current_year = date('Y');
-        $output .= '<input type="number" id="filter_year" name="filter_year" placeholder="Năm (VD: ' . $current_year . ')" min="2000" max="2100" step="1" />';
+        $output .= '<input type="number" id="filter_year" name="filter_year" placeholder="Năm (≥2025)" min="2025" step="1" />';
         
         // Apply button
         $output .= '<button type="button" id="apply_time_filter" class="dnd-btn-apply">Áp dụng</button>';

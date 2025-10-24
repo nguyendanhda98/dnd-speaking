@@ -45,9 +45,49 @@ jQuery(document).ready(function($) {
 
     // Handle apply time filter button
     $historyBlock.on('click', '#apply_time_filter', function() {
-        currentFilterDay = $('#filter_day').val();
-        currentFilterMonth = $('#filter_month').val();
-        currentFilterYear = $('#filter_year').val();
+        let day = $('#filter_day').val();
+        let month = $('#filter_month').val();
+        let year = $('#filter_year').val();
+        
+        // Validate day (0 < day < 32)
+        if (day !== '' && day !== null) {
+            day = parseInt(day);
+            if (day <= 0 || day >= 32) {
+                alert('Ngày phải từ 1 đến 31');
+                return;
+            }
+            day = day.toString();
+        } else {
+            day = '';
+        }
+        
+        // Validate month (0 < month < 13)
+        if (month !== '' && month !== null) {
+            month = parseInt(month);
+            if (month <= 0 || month >= 13) {
+                alert('Tháng phải từ 1 đến 12');
+                return;
+            }
+            month = month.toString();
+        } else {
+            month = '';
+        }
+        
+        // Validate year (year >= 2025)
+        if (year !== '' && year !== null) {
+            year = parseInt(year);
+            if (year < 2025) {
+                alert('Năm phải từ 2025 trở lên');
+                return;
+            }
+            year = year.toString();
+        } else {
+            year = '';
+        }
+        
+        currentFilterDay = day;
+        currentFilterMonth = month;
+        currentFilterYear = year;
         currentPage = 1; // Reset to first page
         loadSessionHistory();
     });

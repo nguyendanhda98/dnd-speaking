@@ -37,12 +37,14 @@
     border-radius: 4px;
     background: #fff;
     font-size: 14px;
-    min-width: 120px;
 }
 
 .dnd-time-period-filters input[type="number"]#filter_day {
-    width: 80px;
-    min-width: 80px;
+    width: 100px;
+}
+
+.dnd-time-period-filters input[type="number"]#filter_month {
+    width: 110px;
 }
 
 .dnd-time-period-filters input[type="number"]#filter_year {
