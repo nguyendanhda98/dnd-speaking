@@ -438,37 +438,6 @@ class DND_Speaking_Admin {
             'dnd_speaking_main'
         );
 
-        add_settings_section(
-            'dnd_speaking_discord',
-            'Discord Integration',
-            null,
-            'dnd_speaking_settings'
-        );
-
-        add_settings_field(
-            'discord_client_id',
-            'Discord Client ID',
-            [$this, 'discord_client_id_field'],
-            'dnd_speaking_settings',
-            'dnd_speaking_discord'
-        );
-
-        add_settings_field(
-            'discord_client_secret',
-            'Discord Client Secret',
-            [$this, 'discord_client_secret_field'],
-            'dnd_speaking_settings',
-            'dnd_speaking_discord'
-        );
-
-        add_settings_field(
-            'discord_bot_token',
-            'Discord Bot Token',
-            [$this, 'discord_bot_token_field'],
-            'dnd_speaking_settings',
-            'dnd_speaking_discord'
-        );
-
         // Discord settings
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_client_id');
         register_setting('dnd_speaking_discord_settings', 'dnd_discord_client_secret');
