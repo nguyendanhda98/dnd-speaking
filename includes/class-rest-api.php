@@ -851,7 +851,16 @@ class DND_Speaking_REST_API {
                 
                 $current_time = strtotime(date('Y-m-d', $current_date) . " {$start_hour}:{$start_minute}:00");
                 
+                // Calculate minimum bookable time (now + 10 minutes)
+                $min_bookable_time = strtotime('+10 minutes', $now);
+                
                 while ($current_time <= $bookable_end_time) {
+                    // Skip slots that start within 10 minutes from now
+                    if ($current_time <= $min_bookable_time) {
+                        $current_time = strtotime('+30 minutes', $current_time);
+                        continue;
+                    }
+                    
                     $slot_time = date('Y-m-d H:i:s', $current_time);
                     if (!in_array($slot_time, $booked_times)) {
                         $available_slots[] = [
@@ -2475,5 +2484,58 @@ class DND_Speaking_REST_API {
             'message' => 'Phiên học đã được bắt đầu thành công!'
         ], 200);
     }
+
+    /**
+     * Auto-cancel pending sessions that start within 5 minutes and haven't been accepted
+     * This function is called by WP Cron every minute
+     */
+    public static function auto_cancel_unaccepted_sessions() {
+        global $wpdb;
+        
+        // Set timezone to Vietnam
+        date_default_timezone_set('Asia/Ho_Chi_Minh');
+        
+        $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
+        
+        // Find all pending sessions that start within 5 minutes
+        $five_minutes_from_now = date('Y-m-d H:i:s', strtotime('+5 minutes'));
+        $now = date('Y-m-d H:i:s');
+        
+        $pending_sessions = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $sessions_table 
+             WHERE status = 'pending' 
+             AND start_time <= %s 
+             AND start_time > %s",
+            $five_minutes_from_now,
+            $now
+        ));
+        
+        foreach ($pending_sessions as $session) {
+            // Cancel the session
+            $wpdb->update(
+                $sessions_table,
+                [
+                    'status' => 'cancelled',
+                    'cancelled_at' => current_time('mysql'),
+                    'cancelled_by' => 0 // 0 means auto-cancelled by system
+                ],
+                ['id' => $session->id],
+                ['%s', '%s', '%d'],
+                ['%d']
+            );
+            
+            // Refund the student's credit
+            if (DND_Speaking_Helpers::add_user_credits($session->student_id, 1)) {
+                error_log("DND Speaking Auto-Cancel: Refunded 1 credit to student ID {$session->student_id} for session ID {$session->id}");
+            }
+            
+            error_log("DND Speaking Auto-Cancel: Cancelled session ID {$session->id} (teacher didn't accept within time limit)");
+        }
+        
+        if (count($pending_sessions) > 0) {
+            error_log("DND Speaking Auto-Cancel: Processed " . count($pending_sessions) . " pending sessions");
+        }
+    }
 }
+
 

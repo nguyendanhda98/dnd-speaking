@@ -10,7 +10,18 @@ class DND_Speaking_Activator {
     public static function activate() {
         self::create_database_tables();
         self::update_database_tables();
+        self::setup_cron_jobs();
         flush_rewrite_rules();
+    }
+
+    /**
+     * Setup cron jobs for auto-cancelling unaccepted sessions
+     */
+    private static function setup_cron_jobs() {
+        // Schedule the auto-cancel cron job to run every minute
+        if (!wp_next_scheduled('dnd_speaking_auto_cancel_sessions')) {
+            wp_schedule_event(time(), 'every_minute', 'dnd_speaking_auto_cancel_sessions');
+        }
     }
 
     private static function create_database_tables() {
