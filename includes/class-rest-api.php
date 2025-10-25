@@ -1334,6 +1334,38 @@ class DND_Speaking_REST_API {
             wp_send_json_error('Session not found or access denied');
         }
 
+        // IMPORTANT: Check if teacher is trying to confirm a session that has already passed
+        if ($new_status === 'confirmed' && $session->status === 'pending') {
+            // Get current time in site timezone
+            $current_time = current_time('mysql');
+            
+            // Session start time is stored in UTC, convert to local time for comparison
+            $session_start_local = get_date_from_gmt($session->start_time);
+            
+            // If session start time has passed, reject the confirmation
+            if ($session_start_local <= $current_time) {
+                error_log('TEACHER CONFIRM EXPIRED SESSION - Session start time has passed. Session ID: ' . $session_id . ', Start time: ' . $session_start_local . ', Current time: ' . $current_time);
+                
+                // Refund the student since the session can't be confirmed
+                $student_id = $session->student_id;
+                DND_Speaking_Helpers::refund_user_credits($student_id, 1, 'Session expired - teacher confirmed after start time');
+                
+                // Update session status to cancelled
+                $wpdb->update(
+                    $sessions_table,
+                    ['status' => 'cancelled'],
+                    ['id' => $session_id],
+                    ['%s'],
+                    ['%d']
+                );
+                
+                error_log('TEACHER CONFIRM EXPIRED SESSION - Refunded 1 credit to student: ' . $student_id . ' and marked session as cancelled');
+                
+                wp_send_json_error('Buổi học đã quá giờ khai giảng, không thể xác nhận. Hệ thống đã hoàn lại credits cho học viên.');
+                return;
+            }
+        }
+
         $room_cleared = false;
         $webhook_url = get_option('dnd_discord_webhook');
         
@@ -2423,6 +2455,31 @@ class DND_Speaking_REST_API {
         
         if (!$session) {
             return new WP_Error('session_not_found', 'Session không tồn tại hoặc không thuộc quyền của bạn', ['status' => 404]);
+        }
+        
+        // Check if the session start time has passed by more than 10 minutes (grace period)
+        $current_time = current_time('mysql');
+        $session_start_local = get_date_from_gmt($session->start_time);
+        $grace_period_end = date('Y-m-d H:i:s', strtotime($session_start_local . ' +10 minutes'));
+        
+        if ($current_time > $grace_period_end) {
+            error_log('TEACHER START SESSION - Session expired. Session ID: ' . $session_id . ', Start time: ' . $session_start_local . ', Grace period end: ' . $grace_period_end . ', Current time: ' . $current_time);
+            
+            // Refund the student since session can't be started
+            DND_Speaking_Helpers::refund_user_credits($session->student_id, 1, 'Session expired - teacher started after grace period');
+            
+            // Update session status to cancelled
+            $wpdb->update(
+                $sessions_table,
+                ['status' => 'cancelled'],
+                ['id' => $session_id],
+                ['%s'],
+                ['%d']
+            );
+            
+            error_log('TEACHER START SESSION - Refunded 1 credit to student: ' . $session->student_id . ' and marked session as cancelled');
+            
+            return new WP_Error('session_expired', 'Buổi học đã quá giờ khai giảng (quá 10 phút), không thể bắt đầu. Hệ thống đã hoàn lại credits cho học viên.', ['status' => 400]);
         }
         
         // Get teacher's Discord info
