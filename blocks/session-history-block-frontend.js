@@ -304,14 +304,19 @@ jQuery(document).ready(function($) {
                     let errorMsg = 'Có lỗi xảy ra khi bắt đầu buổi học.';
                     try {
                         const errorResponse = JSON.parse(xhr.responseText);
+                        // WP REST API returns errors in 'message' property
                         if (errorResponse.message) {
                             errorMsg = errorResponse.message;
+                        } else if (errorResponse.data && errorResponse.data.message) {
+                            errorMsg = errorResponse.data.message;
                         }
                     } catch (e) {
-                        // Use default error message
+                        // Keep default error message
                     }
                     
                     alert(errorMsg);
+                    // Reload session history to reflect any status changes
+                    loadSessionHistory();
                 }
             });
         }
@@ -399,7 +404,18 @@ jQuery(document).ready(function($) {
                             $button.text('Xác nhận');
                         }
                     }
-                    alert(response.data && response.data.message ? response.data.message : 'Không thể cập nhật trạng thái buổi học. Vui lòng thử lại.');
+                    // wp_send_json_error() returns data directly as string, not as data.message
+                    var errorMessage = 'Không thể cập nhật trạng thái buổi học. Vui lòng thử lại.';
+                    if (response.data) {
+                        if (typeof response.data === 'string') {
+                            errorMessage = response.data;
+                        } else if (response.data.message) {
+                            errorMessage = response.data.message;
+                        }
+                    }
+                    alert(errorMessage);
+                    // Reload session history after showing error (to reflect cancelled status)
+                    loadSessionHistory();
                 }
             },
             error: function(xhr, status, error) {

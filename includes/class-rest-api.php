@@ -1334,7 +1334,7 @@ class DND_Speaking_REST_API {
             wp_send_json_error('Session not found or access denied');
         }
 
-        // IMPORTANT: Check if teacher is trying to confirm a session that has already passed
+        // IMPORTANT: Check if teacher is trying to confirm a session that has already passed or is too close to start time
         if ($new_status === 'confirmed' && $session->status === 'pending') {
             // Get current time in site timezone
             $current_time = current_time('mysql');
@@ -1342,13 +1342,16 @@ class DND_Speaking_REST_API {
             // Session start time is stored in UTC, convert to local time for comparison
             $session_start_local = get_date_from_gmt($session->start_time);
             
-            // If session start time has passed, reject the confirmation
-            if ($session_start_local <= $current_time) {
-                error_log('TEACHER CONFIRM EXPIRED SESSION - Session start time has passed. Session ID: ' . $session_id . ', Start time: ' . $session_start_local . ', Current time: ' . $current_time);
+            // Calculate minimum confirmation time (5 minutes before session starts)
+            $min_confirm_time = date('Y-m-d H:i:s', strtotime($session_start_local . ' -5 minutes'));
+            
+            // If current time is >= minimum confirmation time (i.e., less than 5 minutes before start or already passed)
+            if ($current_time >= $min_confirm_time) {
+                error_log('TEACHER CONFIRM TOO LATE - Session needs to be confirmed at least 5 minutes before start. Session ID: ' . $session_id . ', Start time: ' . $session_start_local . ', Min confirm time: ' . $min_confirm_time . ', Current time: ' . $current_time);
                 
                 // Refund the student since the session can't be confirmed
                 $student_id = $session->student_id;
-                DND_Speaking_Helpers::refund_user_credits($student_id, 1, 'Session expired - teacher confirmed after start time');
+                DND_Speaking_Helpers::refund_user_credits($student_id, 1, 'Session not confirmed - teacher confirmed too close to start time');
                 
                 // Update session status to cancelled
                 $wpdb->update(
@@ -1359,9 +1362,9 @@ class DND_Speaking_REST_API {
                     ['%d']
                 );
                 
-                error_log('TEACHER CONFIRM EXPIRED SESSION - Refunded 1 credit to student: ' . $student_id . ' and marked session as cancelled');
+                error_log('TEACHER CONFIRM TOO LATE - Refunded 1 credit to student: ' . $student_id . ' and marked session as cancelled');
                 
-                wp_send_json_error('Buổi học đã quá giờ khai giảng, không thể xác nhận. Hệ thống đã hoàn lại credits cho học viên.');
+                wp_send_json_error('Không thể xác nhận buổi học vì còn ít hơn 5 phút hoặc đã quá giờ khai giảng. Buổi học cần được xác nhận tối thiểu trước 5 phút. Hệ thống đã hoàn lại credits cho học viên.');
                 return;
             }
         }
