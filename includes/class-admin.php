@@ -161,6 +161,12 @@ class DND_Speaking_Admin {
         $table_sessions = $wpdb->prefix . 'dnd_speaking_sessions';
         $teacher_role = get_option('dnd_teacher_role', 'teacher');
         
+        // Check if viewing specific teacher details
+        if (isset($_GET['teacher_id'])) {
+            $this->teacher_details_page(intval($_GET['teacher_id']));
+            return;
+        }
+        
         // Get all users with teacher role
         $users = get_users(['role' => $teacher_role]);
         
@@ -181,6 +187,7 @@ class DND_Speaking_Admin {
                         <th>Name</th>
                         <th>Sessions Taught</th>
                         <th>Available</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -193,10 +200,220 @@ class DND_Speaking_Admin {
                             <td><?php echo esc_html($user->display_name); ?></td>
                             <td><?php echo $sessions; ?></td>
                             <td><?php echo $available ? 'Yes' : 'No'; ?></td>
+                            <td>
+                                <a href="<?php echo admin_url('admin.php?page=dnd-speaking-teachers&teacher_id=' . $user->ID); ?>" class="button button-primary">
+                                    View Details
+                                </a>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
+        <?php
+    }
+
+    public function teacher_details_page($teacher_id) {
+        global $wpdb;
+        $table_sessions = $wpdb->prefix . 'dnd_speaking_sessions';
+        
+        // Get teacher info
+        $teacher = get_user_by('id', $teacher_id);
+        if (!$teacher) {
+            echo '<div class="wrap"><h1>Teacher not found</h1></div>';
+            return;
+        }
+        
+        // Get filter parameters
+        $filter_year = isset($_GET['year']) ? intval($_GET['year']) : null;
+        $filter_month = isset($_GET['month']) ? intval($_GET['month']) : null;
+        $filter_day = isset($_GET['day']) ? intval($_GET['day']) : null;
+        $filter_status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : 'all';
+        
+        // Build query with filters
+        $where_clause = "teacher_id = %d";
+        $query_params = [$teacher_id];
+        
+        if ($filter_year) {
+            $where_clause .= " AND YEAR(start_time) = %d";
+            $query_params[] = $filter_year;
+        }
+        
+        if ($filter_month) {
+            $where_clause .= " AND MONTH(start_time) = %d";
+            $query_params[] = $filter_month;
+        }
+        
+        if ($filter_day) {
+            $where_clause .= " AND DAY(start_time) = %d";
+            $query_params[] = $filter_day;
+        }
+        
+        if ($filter_status !== 'all') {
+            $where_clause .= " AND status = %s";
+            $query_params[] = $filter_status;
+        }
+        
+        // Get sessions
+        $sessions = $wpdb->get_results($wpdb->prepare(
+            "SELECT s.*, u.display_name as student_name 
+             FROM $table_sessions s
+             LEFT JOIN {$wpdb->users} u ON s.student_id = u.ID
+             WHERE $where_clause
+             ORDER BY start_time DESC",
+            $query_params
+        ));
+        
+        // Get available years for filter
+        $years = $wpdb->get_col($wpdb->prepare(
+            "SELECT DISTINCT YEAR(start_time) as year FROM $table_sessions WHERE teacher_id = %d AND start_time IS NOT NULL ORDER BY year DESC",
+            $teacher_id
+        ));
+        
+        // Calculate statistics
+        $total_sessions = count($sessions);
+        $completed_sessions = 0;
+        $cancelled_sessions = 0;
+        $total_duration = 0;
+        
+        foreach ($sessions as $session) {
+            if ($session->status === 'completed') {
+                $completed_sessions++;
+                $total_duration += intval($session->duration);
+            } elseif ($session->status === 'cancelled') {
+                $cancelled_sessions++;
+            }
+        }
+        
+        ?>
+        <div class="wrap dnd-teacher-details">
+            <h1>
+                Teacher Details: <?php echo esc_html($teacher->display_name); ?>
+                <a href="<?php echo admin_url('admin.php?page=dnd-speaking-teachers'); ?>" class="page-title-action">← Back to Teachers</a>
+            </h1>
+            
+            <!-- Statistics -->
+            <div class="dnd-stats-cards">
+                <div class="dnd-stat-card">
+                    <div class="dnd-stat-label">Total Sessions</div>
+                    <div class="dnd-stat-value"><?php echo $total_sessions; ?></div>
+                </div>
+                <div class="dnd-stat-card">
+                    <div class="dnd-stat-label">Completed</div>
+                    <div class="dnd-stat-value"><?php echo $completed_sessions; ?></div>
+                </div>
+                <div class="dnd-stat-card">
+                    <div class="dnd-stat-label">Cancelled</div>
+                    <div class="dnd-stat-value"><?php echo $cancelled_sessions; ?></div>
+                </div>
+                <div class="dnd-stat-card">
+                    <div class="dnd-stat-label">Total Duration</div>
+                    <div class="dnd-stat-value"><?php echo $total_duration; ?> min</div>
+                </div>
+            </div>
+            
+            <!-- Filters -->
+            <div class="dnd-filters">
+                <h2>Filter Sessions</h2>
+                <form method="get" class="dnd-filter-form">
+                    <input type="hidden" name="page" value="dnd-speaking-teachers">
+                    <input type="hidden" name="teacher_id" value="<?php echo $teacher_id; ?>">
+                    
+                    <div class="dnd-filter-row">
+                        <div class="dnd-filter-field">
+                            <label for="filter_status">Status:</label>
+                            <select name="status" id="filter_status">
+                                <option value="all" <?php selected($filter_status, 'all'); ?>>All</option>
+                                <option value="pending" <?php selected($filter_status, 'pending'); ?>>Pending</option>
+                                <option value="confirmed" <?php selected($filter_status, 'confirmed'); ?>>Confirmed</option>
+                                <option value="in_progress" <?php selected($filter_status, 'in_progress'); ?>>In Progress</option>
+                                <option value="completed" <?php selected($filter_status, 'completed'); ?>>Completed</option>
+                                <option value="cancelled" <?php selected($filter_status, 'cancelled'); ?>>Cancelled</option>
+                            </select>
+                        </div>
+                        
+                        <div class="dnd-filter-field">
+                            <label for="filter_year">Year:</label>
+                            <select name="year" id="filter_year">
+                                <option value="">All Years</option>
+                                <?php foreach ($years as $year): ?>
+                                    <option value="<?php echo $year; ?>" <?php selected($filter_year, $year); ?>><?php echo $year; ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="dnd-filter-field">
+                            <label for="filter_month">Month:</label>
+                            <select name="month" id="filter_month">
+                                <option value="">All Months</option>
+                                <?php for ($m = 1; $m <= 12; $m++): ?>
+                                    <option value="<?php echo $m; ?>" <?php selected($filter_month, $m); ?>>
+                                        <?php echo date('F', mktime(0, 0, 0, $m, 1)); ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="dnd-filter-field">
+                            <label for="filter_day">Day:</label>
+                            <select name="day" id="filter_day">
+                                <option value="">All Days</option>
+                                <?php for ($d = 1; $d <= 31; $d++): ?>
+                                    <option value="<?php echo $d; ?>" <?php selected($filter_day, $d); ?>><?php echo $d; ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="dnd-filter-field">
+                            <button type="submit" class="button button-primary">Apply Filter</button>
+                            <a href="<?php echo admin_url('admin.php?page=dnd-speaking-teachers&teacher_id=' . $teacher_id); ?>" class="button">Reset</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Sessions List -->
+            <h2>Sessions List (<?php echo count($sessions); ?> results)</h2>
+            <?php if (empty($sessions)): ?>
+                <p>No sessions found with the current filters.</p>
+            <?php else: ?>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Student</th>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Duration (min)</th>
+                            <th>Status</th>
+                            <th>Discord Channel</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($sessions as $session): ?>
+                            <tr>
+                                <td><?php echo $session->id; ?></td>
+                                <td><?php echo esc_html($session->student_name ?: 'Unknown'); ?></td>
+                                <td><?php echo $session->start_time ?: 'N/A'; ?></td>
+                                <td><?php echo $session->end_time ?: 'N/A'; ?></td>
+                                <td><?php echo $session->duration ?: '0'; ?></td>
+                                <td>
+                                    <span class="dnd-status-badge dnd-status-<?php echo esc_attr($session->status); ?>">
+                                        <?php echo ucfirst($session->status); ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php if (!empty($session->discord_channel)): ?>
+                                        <a href="<?php echo esc_url($session->discord_channel); ?>" target="_blank">View</a>
+                                    <?php else: ?>
+                                        N/A
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
         </div>
         <?php
     }
@@ -533,6 +750,11 @@ class DND_Speaking_Admin {
         // Only load on DND Speaking settings pages
         if (strpos($hook, 'dnd-speaking') === false) {
             return;
+        }
+        
+        // Enqueue CSS for teacher details page
+        if (strpos($hook, 'dnd-speaking-teachers') !== false) {
+            wp_enqueue_style('dnd-admin-teachers', plugins_url('../assets/css/admin-teachers.css', __FILE__), [], '1.0.0');
         }
         
         wp_enqueue_script('discord-settings', plugins_url('../assets/js/discord-settings.js', __FILE__), array('jquery'), null, true);
