@@ -88,6 +88,12 @@ class DND_Speaking_REST_API {
             'permission_callback' => [$this, 'check_user_logged_in'],
         ]);
 
+        register_rest_route('dnd-speaking/v1', '/discord/check-connection', [
+            'methods' => 'GET',
+            'callback' => [$this, 'check_discord_connection'],
+            'permission_callback' => [$this, 'check_user_logged_in'],
+        ]);
+
         register_rest_route('dnd-speaking/v1', '/discord/user-info', [
             'methods' => 'GET',
             'callback' => [$this, 'get_discord_user_info'],
@@ -2000,6 +2006,34 @@ class DND_Speaking_REST_API {
         delete_user_meta($user_id, 'discord_connected');
 
         return ['success' => true];
+    }
+
+    /**
+     * Check if the current user is connected to Discord
+     */
+    public function check_discord_connection($request) {
+        $user_id = get_current_user_id();
+        
+        if (!$user_id) {
+            return new WP_Error('not_logged_in', 'User is not logged in', ['status' => 401]);
+        }
+
+        $discord_connected = get_user_meta($user_id, 'discord_connected', true);
+        $is_connected = !empty($discord_connected);
+
+        $response = [
+            'connected' => $is_connected
+        ];
+
+        // If not connected, also provide the Discord auth URL
+        if (!$is_connected) {
+            $auth_url_response = $this->get_discord_auth_url($request);
+            if (!is_wp_error($auth_url_response) && isset($auth_url_response['auth_url'])) {
+                $response['auth_url'] = $auth_url_response['auth_url'];
+            }
+        }
+
+        return $response;
     }
 
     public function handle_discord_page_callback() {

@@ -28,14 +28,21 @@ jQuery(document).ready(function($) {
         const originalHtml = $button.html();
         $button.html('<span class="dnd-btn-loading"></span> Đang xử lý...');
         
-        // Check credits before opening booking modal
-        checkCreditsAndProceed(function() {
-            // Re-enable buttons after credit check passes
-            $allButtons.prop('disabled', false);
-            $button.html(originalHtml);
-            openBookingModal(teacherId, teacherName);
+        // Check Discord connection first, then credits before opening booking modal
+        checkDiscordAndProceed(function() {
+            // Discord connected, now check credits
+            checkCreditsAndProceed(function() {
+                // Re-enable buttons after credit check passes
+                $allButtons.prop('disabled', false);
+                $button.html(originalHtml);
+                openBookingModal(teacherId, teacherName);
+            }, function() {
+                // Re-enable buttons if credit check fails
+                $allButtons.prop('disabled', false);
+                $button.html(originalHtml);
+            });
         }, function() {
-            // Re-enable buttons if credit check fails
+            // Re-enable buttons if Discord check fails or user cancels
             $allButtons.prop('disabled', false);
             $button.html(originalHtml);
         });
@@ -142,12 +149,19 @@ jQuery(document).ready(function($) {
             const originalHtml = $button.html();
             $button.html('<span class="dnd-btn-loading"></span> Đang xử lý...');
             
-            // Check credits before starting session
-            checkCreditsAndProceed(function() {
-                // Keep buttons disabled and continue with start now
-                startNowSession(teacherId, teacherName, $button, $allButtons, originalHtml);
+            // Check Discord connection first, then credits before starting session
+            checkDiscordAndProceed(function() {
+                // Discord connected, now check credits
+                checkCreditsAndProceed(function() {
+                    // Keep buttons disabled and continue with start now
+                    startNowSession(teacherId, teacherName, $button, $allButtons, originalHtml);
+                }, function() {
+                    // Re-enable buttons if credit check fails
+                    $allButtons.prop('disabled', false);
+                    $button.html(originalHtml);
+                });
             }, function() {
-                // Re-enable buttons if credit check fails
+                // Re-enable buttons if Discord check fails or user cancels
                 $allButtons.prop('disabled', false);
                 $button.html(originalHtml);
             });
@@ -449,6 +463,48 @@ jQuery(document).ready(function($) {
             error: function(xhr) {
                 console.error('Error checking credits:', xhr);
                 alert('Không thể kiểm tra số buổi học. Vui lòng thử lại.');
+                if (failCallback) {
+                    failCallback();
+                }
+            }
+        });
+    }
+
+    // Check Discord connection before proceeding with booking or starting session
+    function checkDiscordAndProceed(successCallback, failCallback) {
+        $.ajax({
+            url: dnd_speaking_data.rest_url + 'discord/check-connection',
+            method: 'GET',
+            headers: {
+                'X-WP-Nonce': dnd_speaking_data.nonce
+            },
+            success: function(response) {
+                if (response.connected) {
+                    // Connected to Discord, proceed
+                    successCallback();
+                } else {
+                    // Not connected to Discord
+                    if (confirm('Bạn cần kết nối Discord để đặt lịch hoặc bắt đầu học. Bạn có muốn kết nối Discord ngay bây giờ không?')) {
+                        // User wants to connect, redirect to Discord auth
+                        if (response.auth_url) {
+                            window.location.href = response.auth_url;
+                        } else {
+                            alert('Không thể lấy link kết nối Discord. Vui lòng thử lại.');
+                            if (failCallback) {
+                                failCallback();
+                            }
+                        }
+                    } else {
+                        // User doesn't want to connect
+                        if (failCallback) {
+                            failCallback();
+                        }
+                    }
+                }
+            },
+            error: function(xhr) {
+                console.error('Error checking Discord connection:', xhr);
+                alert('Không thể kiểm tra kết nối Discord. Vui lòng thử lại.');
                 if (failCallback) {
                     failCallback();
                 }
