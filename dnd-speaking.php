@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DND Speaking Sessions
  * Description: Basic management for speaking sessions.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: DND English
  */
 

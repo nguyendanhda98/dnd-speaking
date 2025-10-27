@@ -2483,6 +2483,41 @@ class DND_Speaking_REST_API {
             return new WP_Error('missing_session_id', 'Session ID is required', ['status' => 400]);
         }
         
+        // Check if teacher is currently online
+        $teacher_status = get_user_meta($user_id, 'dnd_available', true);
+        $force_offline = $request->get_param('force_offline');
+        
+        if ($teacher_status === '1' && !$force_offline) {
+            return new WP_REST_Response([
+                'success' => false,
+                'teacher_online' => true,
+                'message' => 'Bạn đang online, để bắt đầu phiên học thì bạn phải offline. Bạn có muốn offline rồi bắt đầu phiên học này không?'
+            ], 200);
+        }
+        
+        // If force_offline is true, set teacher to offline before starting session
+        if ($force_offline && $teacher_status === '1') {
+            update_user_meta($user_id, 'dnd_available', '0');
+            
+            // Send webhook to notify Discord that teacher went offline
+            $webhook_url = get_option('dnd_discord_webhook');
+            if ($webhook_url) {
+                $teacher_discord_id = get_user_meta($user_id, 'discord_user_id', true);
+                wp_remote_post($webhook_url, [
+                    'headers' => ['Content-Type' => 'application/json'],
+                    'body' => json_encode([
+                        'action' => 'offline',
+                        'teacher_discord_id' => $teacher_discord_id,
+                        'teacher_wp_id' => $user_id
+                    ]),
+                    'timeout' => 10,
+                    'blocking' => false
+                ]);
+            }
+            
+            error_log('TEACHER START SESSION - Teacher ' . $user_id . ' was online, forced offline before starting session');
+        }
+        
         // Get session and verify it belongs to this teacher
         $sessions_table = $wpdb->prefix . 'dnd_speaking_sessions';
         $session = $wpdb->get_row($wpdb->prepare(

@@ -259,68 +259,72 @@ jQuery(document).ready(function($) {
         const studentId = $button.data('student-id');
         
         if (confirm('Bạn có chắc muốn bắt đầu buổi học này?')) {
-            // Find the parent session item to disable all action buttons
-            const $sessionItem = $button.closest('.dnd-history-item');
-            
-            // Disable ALL buttons in this session (both start and cancel)
-            $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel').prop('disabled', true);
-            
-            // Update button text to show loading
-            $button.text('Đang tạo phòng học...');
-            
-            // Call REST API endpoint to start session
-            $.ajax({
-                url: dnd_session_history_data.rest_url + 'teacher/start-session',
-                method: 'POST',
-                beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', dnd_session_history_data.nonce);
-                },
-                data: JSON.stringify({
-                    session_id: sessionId
-                }),
-                contentType: 'application/json',
-                success: function(response) {
-                    if (response.success) {
-                        alert('Phòng học đã được tạo thành công! Bạn có thể tham gia ngay.');
-                        // Reload the session history to show the join button
-                        loadSessionHistory();
-                    } else {
-                        // Re-enable buttons on error
-                        $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel').prop('disabled', false);
-                        $button.text('Bắt đầu');
-                        
-                        const errorMsg = response.message || 'Không thể bắt đầu buổi học. Vui lòng thử lại.';
-                        alert(errorMsg);
+            startSession(sessionId, $button, false);
+        }
+    });
+    
+    function startSession(sessionId, $button, forceOffline) {
+        // Find the parent session item to disable all action buttons
+        const $sessionItem = $button.closest('.dnd-history-item');
+        
+        // Disable ALL buttons in this session (both start and cancel)
+        $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel').prop('disabled', true);
+        
+        // Update button text to show loading
+        $button.text('Đang tạo phòng học...');
+        
+        // Call REST API endpoint to start session
+        $.ajax({
+            url: dnd_session_history_data.rest_url + 'teacher/start-session',
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', dnd_session_history_data.nonce);
+            },
+            data: JSON.stringify({
+                session_id: sessionId,
+                force_offline: forceOffline
+            }),
+            contentType: 'application/json',
+            success: function(response) {
+                if (response.success) {
+                    alert('Phòng học đã được tạo thành công! Bạn có thể tham gia ngay.');
+                    // Reload the session history to show the join button
+                    loadSessionHistory();
+                } else if (response.teacher_online) {
+                    // Teacher is currently online, ask if they want to go offline first
+                    // Re-enable buttons
+                    $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel').prop('disabled', false);
+                    $button.text('Bắt đầu');
+                    
+                    if (confirm(response.message)) {
+                        // User confirmed, retry with force_offline = true
+                        startSession(sessionId, $button, true);
                     }
-                },
-                error: function(xhr, status, error) {
+                } else {
                     // Re-enable buttons on error
                     $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel').prop('disabled', false);
                     $button.text('Bắt đầu');
                     
-                    console.error('Error starting session:', xhr.responseText, status, error);
-                    
-                    // Try to parse error message from response
-                    let errorMsg = 'Có lỗi xảy ra khi bắt đầu buổi học.';
-                    try {
-                        const errorResponse = JSON.parse(xhr.responseText);
-                        // WP REST API returns errors in 'message' property
-                        if (errorResponse.message) {
-                            errorMsg = errorResponse.message;
-                        } else if (errorResponse.data && errorResponse.data.message) {
-                            errorMsg = errorResponse.data.message;
-                        }
-                    } catch (e) {
-                        // Keep default error message
-                    }
-                    
+                    const errorMsg = response.message || 'Không thể bắt đầu buổi học. Vui lòng thử lại.';
                     alert(errorMsg);
-                    // Reload session history to reflect any status changes
-                    loadSessionHistory();
                 }
-            });
-        }
-    });
+            },
+            error: function(xhr, status, error) {
+                // Re-enable buttons on error
+                $sessionItem.find('.dnd-btn-start, .dnd-btn-cancel').prop('disabled', false);
+                $button.text('Bắt đầu');
+                
+                let errorMsg = 'Không thể bắt đầu buổi học. Vui lòng thử lại.';
+                
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                
+                console.error('Error starting session:', xhr.responseText, status, error);
+                alert(errorMsg);
+            }
+        });
+    }
 
     $historyBlock.on('click', '.dnd-btn-end', function() {
         const $button = $(this);
