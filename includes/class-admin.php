@@ -757,6 +757,24 @@ class DND_Speaking_Admin {
             wp_enqueue_style('dnd-admin-teachers', plugins_url('../assets/css/admin-teachers.css', __FILE__), [], '1.0.0');
         }
         
+        // Enqueue Select2 for students page
+        if (strpos($hook, 'dnd-speaking-students') !== false) {
+            wp_enqueue_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
+            wp_enqueue_script('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', array('jquery'), '4.1.0', true);
+            
+            // Add inline script to initialize Select2
+            $inline_script = "
+            jQuery(document).ready(function($) {
+                $('#user_id').select2({
+                    placeholder: 'Choose a student...',
+                    allowClear: true,
+                    width: '100%'
+                });
+            });
+            ";
+            wp_add_inline_script('select2', $inline_script);
+        }
+        
         wp_enqueue_script('discord-settings', plugins_url('../assets/js/discord-settings.js', __FILE__), array('jquery'), null, true);
         wp_localize_script('discord-settings', 'dndSettings', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
