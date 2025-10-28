@@ -617,6 +617,11 @@ class DND_Speaking_REST_API {
             error_log('STUDENT CANCEL IN_PROGRESS - No refund (student already joined session): ' . $user_id);
         }
 
+        // Send email notification to teacher
+        $session_start_local = get_date_from_gmt($session->start_time);
+        $email_notifications = new DND_Speaking_Email_Notifications();
+        $email_notifications->notify_teacher_student_cancelled($session_id, $user_id, $teacher_id, $session_start_local, $session->status);
+
         return [
             'success' => true,
             'refunded' => $refunded,
@@ -764,6 +769,10 @@ class DND_Speaking_REST_API {
             
             // Commit transaction
             $wpdb->query('COMMIT');
+            
+            // Send email notification to teacher
+            $email_notifications = new DND_Speaking_Email_Notifications();
+            $email_notifications->notify_teacher_new_booking($session_id, $student_id, $teacher_id, $start_time);
             
             return ['success' => true, 'session_id' => $session_id];
             
@@ -1533,6 +1542,20 @@ class DND_Speaking_REST_API {
         );
 
         if ($result !== false) {
+            // Send email notifications based on status change
+            $session_start_local = get_date_from_gmt($session->start_time);
+            $email_notifications = new DND_Speaking_Email_Notifications();
+            
+            // Teacher confirms session -> notify student
+            if ($new_status === 'confirmed' && $session->status === 'pending') {
+                $email_notifications->notify_student_session_confirmed($session_id, $session->student_id, $user_id, $session_start_local);
+            }
+            
+            // Teacher cancels session -> notify student
+            if ($new_status === 'cancelled') {
+                $email_notifications->notify_student_teacher_cancelled($session_id, $session->student_id, $user_id, $session_start_local, $session->status);
+            }
+            
             wp_send_json_success([
                 'message' => 'Session status updated successfully',
                 'room_cleared' => $room_cleared
@@ -2661,6 +2684,10 @@ class DND_Speaking_REST_API {
         
         error_log('TEACHER START SESSION - Session started successfully. ID: ' . $session_id . ', Room Link: ' . $room_link);
         error_log('TEACHER START SESSION - Teacher ' . $user_id . ' status set to busy');
+        
+        // Send email notification to student
+        $email_notifications = new DND_Speaking_Email_Notifications();
+        $email_notifications->notify_student_session_started($session_id, $session->student_id, $user_id, $room_link);
         
         return new WP_REST_Response([
             'success' => true,
