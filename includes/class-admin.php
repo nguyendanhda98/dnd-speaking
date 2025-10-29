@@ -17,6 +17,7 @@ class DND_Speaking_Admin {
         add_action('wp_ajax_handle_upcoming_session', [$this, 'handle_upcoming_session']);
         add_action('wp_ajax_save_teacher_schedule', [$this, 'save_teacher_schedule']);
         add_action('wp_ajax_get_pages', [$this, 'get_pages']);
+        add_action('wp_ajax_load_students_list', [$this, 'ajax_load_students_list']);
         add_filter('pre_update_option_dnd_discord_bot_token', [$this, 'validate_discord_bot_token'], 10, 2);
         add_action('user_register', [$this, 'auto_assign_lessons_to_new_user']);
     }
@@ -97,7 +98,22 @@ class DND_Speaking_Admin {
             return;
         }
         
-        $students = $wpdb->get_results("SELECT * FROM $table ORDER BY credits DESC");
+        // Pagination settings
+        $per_page = isset($_GET['per_page']) ? intval($_GET['per_page']) : 10;
+        $per_page = in_array($per_page, [1, 3, 5, 10, 20, 50, 100]) ? $per_page : 10;
+        $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+        $offset = ($current_page - 1) * $per_page;
+        
+        // Get total count
+        $total_students = $wpdb->get_var("SELECT COUNT(*) FROM $table");
+        $total_pages = ceil($total_students / $per_page);
+        
+        // Get students with pagination
+        $students = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $table ORDER BY credits DESC LIMIT %d OFFSET %d",
+            $per_page,
+            $offset
+        ));
 
         // Display notices
         if (isset($_GET['bulk_added'])) {
@@ -399,39 +415,235 @@ class DND_Speaking_Admin {
 
             <!-- Students List -->
             <h2>Danh Sách Học Viên</h2>
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th style="width: 80px;">ID</th>
-                        <th>Tên</th>
-                        <th style="width: 120px;">Số Buổi Còn Lại</th>
-                        <th style="width: 150px;">Thao Tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($students)): ?>
+            
+            <!-- Pagination Controls Top -->
+            <div class="tablenav top">
+                <div class="alignleft actions">
+                    <label for="per-page-selector">Hiển thị:</label>
+                    <select id="per-page-selector" style="width: auto;">
+                        <option value="1" <?php selected($per_page, 1); ?>>1 học viên</option>
+                        <option value="3" <?php selected($per_page, 3); ?>>3 học viên</option>
+                        <option value="5" <?php selected($per_page, 5); ?>>5 học viên</option>
+                        <option value="10" <?php selected($per_page, 10); ?>>10 học viên</option>
+                        <option value="20" <?php selected($per_page, 20); ?>>20 học viên</option>
+                        <option value="50" <?php selected($per_page, 50); ?>>50 học viên</option>
+                        <option value="100" <?php selected($per_page, 100); ?>>100 học viên</option>
+                    </select>
+                    <span id="total-students-display" style="margin-left: 10px; color: #666;">
+                        Tổng: <strong><?php echo $total_students; ?></strong> học viên
+                    </span>
+                </div>
+                
+                <div id="pagination-top-container">
+                <?php if ($total_pages > 1): ?>
+                    <div class="tablenav-pages">
+                        <span class="displaying-num"><?php echo $total_students; ?> mục</span>
+                        <span class="pagination-links">
+                            <?php
+                            // First page
+                            if ($current_page > 1) {
+                                echo '<a class="first-page button" href="#" data-page="1"><span aria-hidden="true">«</span></a>';
+                                echo '<a class="prev-page button" href="#" data-page="' . ($current_page - 1) . '"><span aria-hidden="true">‹</span></a>';
+                            } else {
+                                echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">«</span>';
+                                echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">‹</span>';
+                            }
+                            
+                            // Current page
+                            echo '<span class="paging-input">';
+                            echo '<label for="current-page-selector" class="screen-reader-text">Trang hiện tại</label>';
+                            echo '<input class="current-page" id="current-page-selector" type="text" name="paged" value="' . $current_page . '" size="2" aria-describedby="table-paging">';
+                            echo '<span class="tablenav-paging-text"> / <span class="total-pages">' . $total_pages . '</span></span>';
+                            echo '</span>';
+                            
+                            // Last page
+                            if ($current_page < $total_pages) {
+                                echo '<a class="next-page button" href="#" data-page="' . ($current_page + 1) . '"><span aria-hidden="true">›</span></a>';
+                                echo '<a class="last-page button" href="#" data-page="' . $total_pages . '"><span aria-hidden="true">»</span></a>';
+                            } else {
+                                echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">›</span>';
+                                echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">»</span>';
+                            }
+                            ?>
+                        </span>
+                    </div>
+                <?php endif; ?>
+                </div>
+            </div>
+            
+            <!-- Students Table Container -->
+            <div id="students-table-container">
+            <!-- Students Table Container -->
+            <div id="students-table-container">
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
                         <tr>
-                            <td colspan="4" style="text-align: center;">Chưa có học viên nào</td>
+                            <th style="width: 80px;">ID</th>
+                            <th>Tên Học Viên</th>
+                            <th style="width: 120px;">Buổi Học Còn Lại</th>
+                            <th style="width: 150px;">Thao Tác</th>
                         </tr>
-                    <?php else: ?>
-                        <?php foreach ($students as $student): 
-                            $user = get_user_by('id', $student->user_id);
-                            if (!$user) continue;
-                        ?>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($students)): ?>
                             <tr>
-                                <td><?php echo $student->user_id; ?></td>
-                                <td><?php echo esc_html($user->display_name); ?></td>
-                                <td><strong><?php echo $student->credits; ?></strong></td>
-                                <td>
-                                    <a href="<?php echo admin_url('admin.php?page=dnd-speaking-students&student_id=' . $student->user_id); ?>" class="button button-primary">
-                                        Xem Chi Tiết
-                                    </a>
+                                <td colspan="4" style="text-align: center; padding: 20px; color: #999;">
+                                    Không có học viên nào
                                 </td>
                             </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                        <?php else: ?>
+                            <?php foreach ($students as $student): 
+                                $user = get_userdata($student->user_id);
+                                if (!$user) continue;
+                            ?>
+                                <tr>
+                                    <td><?php echo $student->user_id; ?></td>
+                                    <td><?php echo esc_html($user->display_name); ?></td>
+                                    <td><strong><?php echo $student->credits; ?></strong></td>
+                                    <td>
+                                        <a href="<?php echo admin_url('admin.php?page=dnd-speaking-students&student_id=' . $student->user_id); ?>" class="button button-primary">
+                                            Xem Chi Tiết
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination Controls Bottom -->
+            <div id="pagination-bottom-container">
+            <?php if ($total_pages > 1): ?>
+                <div class="tablenav bottom">
+                    <div class="tablenav-pages">
+                        <span class="displaying-num"><?php echo $total_students; ?> mục</span>
+                        <span class="pagination-links">
+                            <?php
+                            // First page
+                            if ($current_page > 1) {
+                                echo '<a class="first-page button" href="#" data-page="1"><span aria-hidden="true">«</span></a>';
+                                echo '<a class="prev-page button" href="#" data-page="' . ($current_page - 1) . '"><span aria-hidden="true">‹</span></a>';
+                            } else {
+                                echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">«</span>';
+                                echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">‹</span>';
+                            }
+                            
+                            // Current page
+                            echo '<span class="paging-input">';
+                            echo '<label for="current-page-selector-bottom" class="screen-reader-text">Trang hiện tại</label>';
+                            echo '<input class="current-page" id="current-page-selector-bottom" type="text" name="paged" value="' . $current_page . '" size="2" aria-describedby="table-paging">';
+                            echo '<span class="tablenav-paging-text"> / <span class="total-pages">' . $total_pages . '</span></span>';
+                            echo '</span>';
+                            
+                            // Last page
+                            if ($current_page < $total_pages) {
+                                echo '<a class="next-page button" href="#" data-page="' . ($current_page + 1) . '"><span aria-hidden="true">›</span></a>';
+                                echo '<a class="last-page button" href="#" data-page="' . $total_pages . '"><span aria-hidden="true">»</span></a>';
+                            } else {
+                                echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">›</span>';
+                                echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">»</span>';
+                            }
+                            ?>
+                        </span>
+                    </div>
+                </div>
+            <?php endif; ?>
+            </div>
+            
+            <script type="text/javascript">
+            // AJAX Pagination
+            var currentPage = <?php echo $current_page; ?>;
+            var perPage = <?php echo $per_page; ?>;
+            var isLoading = false;
+            
+            function loadStudentsList(page, per_page) {
+                if (isLoading) return;
+                isLoading = true;
+                
+                // Show loading state
+                var tableContainer = document.getElementById('students-table-container');
+                tableContainer.style.opacity = '0.5';
+                tableContainer.style.pointerEvents = 'none';
+                
+                jQuery.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'load_students_list',
+                        nonce: '<?php echo wp_create_nonce('dnd_students_list_nonce'); ?>',
+                        per_page: per_page,
+                        paged: page
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Update table
+                            tableContainer.innerHTML = response.data.table_html;
+                            
+                            // Update pagination controls
+                            document.getElementById('pagination-top-container').innerHTML = response.data.pagination_html;
+                            document.getElementById('pagination-bottom-container').innerHTML = response.data.pagination_html ? '<div class="tablenav bottom">' + response.data.pagination_html + '</div>' : '';
+                            
+                            // Update total students display
+                            document.getElementById('total-students-display').innerHTML = 'Tổng: <strong>' + response.data.total_students + '</strong> học viên';
+                            
+                            // Update current state
+                            currentPage = response.data.current_page;
+                            perPage = response.data.per_page;
+                            
+                            // Re-bind event listeners
+                            bindPaginationEvents();
+                            
+                            // Remove loading state
+                            tableContainer.style.opacity = '1';
+                            tableContainer.style.pointerEvents = 'auto';
+                        } else {
+                            alert('Có lỗi xảy ra: ' + (response.data.message || 'Unknown error'));
+                        }
+                        isLoading = false;
+                    },
+                    error: function() {
+                        alert('Có lỗi xảy ra khi tải danh sách học viên');
+                        tableContainer.style.opacity = '1';
+                        tableContainer.style.pointerEvents = 'auto';
+                        isLoading = false;
+                    }
+                });
+            }
+            
+            function bindPaginationEvents() {
+                // Bind pagination links
+                jQuery('#pagination-top-container a[data-page], #pagination-bottom-container a[data-page]').on('click', function(e) {
+                    e.preventDefault();
+                    var page = parseInt(jQuery(this).data('page'));
+                    loadStudentsList(page, perPage);
+                });
+                
+                // Bind page input change
+                jQuery('#current-page-selector, #current-page-selector-bottom').on('change', function() {
+                    var page = parseInt(jQuery(this).val());
+                    var totalPages = parseInt(jQuery(this).closest('.paging-input').find('.total-pages').text());
+                    
+                    if (page > 0 && page <= totalPages) {
+                        loadStudentsList(page, perPage);
+                    } else {
+                        alert('Vui lòng nhập số trang từ 1 đến ' + totalPages);
+                        jQuery(this).val(currentPage);
+                    }
+                });
+            }
+            
+            // Bind per page selector
+            jQuery('#per-page-selector').on('change', function() {
+                perPage = parseInt(jQuery(this).val());
+                loadStudentsList(1, perPage); // Reset to page 1 when changing per page
+            });
+            
+            // Initial bind
+            jQuery(document).ready(function() {
+                bindPaginationEvents();
+            });
+            </script>
         </div>
         <?php
     }
@@ -1335,6 +1547,125 @@ class DND_Speaking_Admin {
         error_log('Redirecting with success count: ' . $success_count);
         wp_redirect(admin_url('admin.php?page=dnd-speaking-students&bulk_removed=' . $success_count));
         exit;
+    }
+
+    public function ajax_load_students_list() {
+        check_ajax_referer('dnd_students_list_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Unauthorized']);
+            return;
+        }
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'dnd_speaking_credits';
+        
+        // Get pagination parameters
+        $per_page = isset($_POST['per_page']) ? intval($_POST['per_page']) : 10;
+        $per_page = in_array($per_page, [1, 3, 5, 10, 20, 50, 100]) ? $per_page : 10;
+        $current_page = isset($_POST['paged']) ? max(1, intval($_POST['paged'])) : 1;
+        $offset = ($current_page - 1) * $per_page;
+        
+        // Get total count
+        $total_students = $wpdb->get_var("SELECT COUNT(*) FROM $table");
+        $total_pages = ceil($total_students / $per_page);
+        
+        // Get students with pagination
+        $students = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $table ORDER BY credits DESC LIMIT %d OFFSET %d",
+            $per_page,
+            $offset
+        ));
+        
+        // Generate HTML for students table
+        ob_start();
+        ?>
+        <table class="wp-list-table widefat fixed striped">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">ID</th>
+                    <th>Tên Học Viên</th>
+                    <th style="width: 120px;">Buổi Học Còn Lại</th>
+                    <th style="width: 150px;">Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($students)): ?>
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 20px; color: #999;">
+                            Không có học viên nào
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($students as $student): ?>
+                        <?php $user = get_userdata($student->user_id); ?>
+                        <?php if ($user): ?>
+                            <tr>
+                                <td><?php echo $student->user_id; ?></td>
+                                <td><?php echo esc_html($user->display_name); ?></td>
+                                <td><strong><?php echo $student->credits; ?></strong></td>
+                                <td>
+                                    <a href="<?php echo admin_url('admin.php?page=dnd-speaking-students&student_id=' . $student->user_id); ?>" class="button button-primary">
+                                        Xem Chi Tiết
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+        <?php
+        $table_html = ob_get_clean();
+        
+        // Generate pagination HTML
+        ob_start();
+        if ($total_pages > 1):
+            $base_url = admin_url('admin.php?page=dnd-speaking-students&per_page=' . $per_page);
+        ?>
+        <div class="tablenav-pages">
+            <span class="displaying-num"><?php echo $total_students; ?> mục</span>
+            <span class="pagination-links">
+                <?php
+                // First page
+                if ($current_page > 1) {
+                    echo '<a class="first-page button" href="#" data-page="1"><span aria-hidden="true">«</span></a>';
+                    echo '<a class="prev-page button" href="#" data-page="' . ($current_page - 1) . '"><span aria-hidden="true">‹</span></a>';
+                } else {
+                    echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">«</span>';
+                    echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">‹</span>';
+                }
+                
+                // Current page
+                echo '<span class="paging-input">';
+                echo '<label for="current-page-selector" class="screen-reader-text">Trang hiện tại</label>';
+                echo '<input class="current-page" id="current-page-selector" type="text" name="paged" value="' . $current_page . '" size="2" aria-describedby="table-paging">';
+                echo '<span class="tablenav-paging-text"> / <span class="total-pages">' . $total_pages . '</span></span>';
+                echo '</span>';
+                
+                // Last page
+                if ($current_page < $total_pages) {
+                    echo '<a class="next-page button" href="#" data-page="' . ($current_page + 1) . '"><span aria-hidden="true">›</span></a>';
+                    echo '<a class="last-page button" href="#" data-page="' . $total_pages . '"><span aria-hidden="true">»</span></a>';
+                } else {
+                    echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">›</span>';
+                    echo '<span class="tablenav-pages-navspan button disabled" aria-hidden="true">»</span>';
+                }
+                ?>
+            </span>
+        </div>
+        <?php
+        endif;
+        $pagination_html = ob_get_clean();
+        
+        wp_send_json_success([
+            'table_html' => $table_html,
+            'pagination_html' => $pagination_html,
+            'total_students' => $total_students,
+            'current_page' => $current_page,
+            'total_pages' => $total_pages,
+            'per_page' => $per_page
+        ]);
     }
 
     public function auto_assign_lessons_to_new_user($user_id) {
