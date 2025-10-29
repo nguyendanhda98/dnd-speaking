@@ -118,7 +118,7 @@ class DND_Speaking_Admin {
             
             <!-- Manage Lessons Form -->
             <h2>Quản Lý Buổi Học</h2>
-            <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" id="manage-lessons-form">
+            <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" id="manage-lessons-form" novalidate>
                 <input type="hidden" name="action" id="manage-action" value="bulk_add_lessons">
                 <?php wp_nonce_field('bulk_lessons_nonce'); ?>
                 
@@ -195,7 +195,7 @@ class DND_Speaking_Admin {
                 </table>
                 
                 <p class="submit">
-                    <button type="submit" name="submit" class="button button-primary" onclick="return handleAddLessons()">
+                    <button type="submit" class="button button-primary" onclick="return handleAddLessons()">
                         ➕ Thêm Buổi Học
                     </button>
                     <button type="button" class="button button-secondary" onclick="handleRemoveLessons()" style="margin-left: 10px;">
@@ -357,25 +357,41 @@ class DND_Speaking_Admin {
             }
             
             function handleRemoveLessons() {
+                console.log('handleRemoveLessons called');
                 var applyToAll = document.getElementById('apply_to_all').checked;
                 var credits = document.getElementById('credits').value;
+                
+                console.log('Apply to all:', applyToAll);
+                console.log('Credits:', credits);
+                console.log('Selected students:', selectedStudents.length);
                 
                 if (applyToAll) {
                     var totalUsers = allStudents.length;
                     if (!confirm('⚠️ CẢNH BÁO: Bạn có chắc muốn TRỪ ' + credits + ' buổi học từ TẤT CẢ ' + totalUsers + ' học viên không?\n\nHành động này không thể hoàn tác!')) {
+                        console.log('User cancelled (apply to all)');
                         return false;
                     }
                 } else if (selectedStudents.length === 0) {
                     alert('Vui lòng chọn ít nhất một học viên hoặc tích "Áp dụng cho toàn bộ"');
+                    console.log('No students selected');
                     return false;
                 } else {
                     if (!confirm('Bạn có chắc muốn TRỪ ' + credits + ' buổi học từ ' + selectedStudents.length + ' học viên đã chọn không?\n\nHọc viên không đủ số buổi sẽ bị bỏ qua.')) {
+                        console.log('User cancelled');
                         return false;
                     }
                 }
                 
+                // Set action and submit form using proper method
+                console.log('Setting action to bulk_remove_lessons');
                 document.getElementById('manage-action').value = 'bulk_remove_lessons';
-                document.getElementById('manage-lessons-form').submit();
+                console.log('Submitting form...');
+                
+                // Use HTMLFormElement.prototype.submit to avoid conflicts
+                var form = document.getElementById('manage-lessons-form');
+                HTMLFormElement.prototype.submit.call(form);
+                
+                return false; // Prevent default button behavior
             }
             </script>
 
@@ -1255,21 +1271,31 @@ class DND_Speaking_Admin {
     }
 
     public function handle_bulk_remove_lessons() {
+        // Debug logging
+        error_log('handle_bulk_remove_lessons called');
+        error_log('POST data: ' . print_r($_POST, true));
+        
         // Check nonce for security
         if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'bulk_lessons_nonce')) {
+            error_log('Nonce check failed');
             wp_die('Security check failed');
         }
 
         // Check user capabilities
         if (!current_user_can('manage_options')) {
+            error_log('User lacks manage_options capability');
             wp_die('Unauthorized');
         }
 
         $apply_to_all = isset($_POST['apply_to_all']) && $_POST['apply_to_all'] === '1';
         $credits = isset($_POST['credits']) ? intval($_POST['credits']) : 0;
+        
+        error_log('Apply to all: ' . ($apply_to_all ? 'yes' : 'no'));
+        error_log('Credits: ' . $credits);
 
         // Validate credits
         if ($credits <= 0) {
+            error_log('Invalid credits amount: ' . $credits);
             wp_die('Invalid input: Please specify positive number of lessons');
         }
 
@@ -1281,24 +1307,32 @@ class DND_Speaking_Admin {
                 'fields' => ['ID']
             ]);
             $user_ids = array_map(function($user) { return $user->ID; }, $all_users);
+            error_log('Apply to all: ' . count($user_ids) . ' users');
         } else {
             // Get from hidden field (comma-separated IDs)
             $user_ids_string = isset($_POST['user_ids_hidden']) ? $_POST['user_ids_hidden'] : '';
+            error_log('user_ids_hidden: ' . $user_ids_string);
+            
             if (empty($user_ids_string)) {
+                error_log('No user IDs provided');
                 wp_die('Invalid input: Please select students or check "Apply to all"');
             }
             $user_ids = array_map('intval', explode(',', $user_ids_string));
+            error_log('Selected users: ' . count($user_ids));
         }
 
         // Bulk remove lessons
+        error_log('Calling bulk_remove_lessons for ' . count($user_ids) . ' users');
         $results = DND_Speaking_Helpers::bulk_remove_lessons($user_ids, $credits);
         $success_count = count(array_filter($results));
+        error_log('Success count: ' . $success_count);
 
         // Log the action
         $log_detail = $apply_to_all ? "Removed $credits lessons from ALL students ($success_count succeeded)" : "Removed $credits lessons from $success_count selected students";
         DND_Speaking_Helpers::log_action(get_current_user_id(), 'bulk_remove_lessons', $log_detail);
 
         // Redirect back with success message
+        error_log('Redirecting with success count: ' . $success_count);
         wp_redirect(admin_url('admin.php?page=dnd-speaking-students&bulk_removed=' . $success_count));
         exit;
     }
