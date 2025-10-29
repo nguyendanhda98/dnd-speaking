@@ -576,16 +576,43 @@ class DND_Speaking_Admin {
                         paged: page
                     },
                     success: function(response) {
+                        console.log('AJAX Response:', response);
                         if (response.success) {
+                            console.log('Updating table...');
                             // Update table
                             tableContainer.innerHTML = response.data.table_html;
                             
                             // Update pagination controls
-                            document.getElementById('pagination-top-container').innerHTML = response.data.pagination_html;
-                            document.getElementById('pagination-bottom-container').innerHTML = response.data.pagination_html ? '<div class="tablenav bottom">' + response.data.pagination_html + '</div>' : '';
+                            var paginationTopContainer = document.getElementById('pagination-top-container');
+                            var paginationBottomContainer = document.getElementById('pagination-bottom-container');
+                            
+                            console.log('Pagination top container:', paginationTopContainer);
+                            console.log('Pagination bottom container:', paginationBottomContainer);
+                            console.log('Pagination HTML:', response.data.pagination_html);
+                            
+                            if (paginationTopContainer) {
+                                paginationTopContainer.innerHTML = response.data.pagination_html || '';
+                            }
+                            
+                            if (paginationBottomContainer) {
+                                if (response.data.pagination_html) {
+                                    paginationBottomContainer.innerHTML = '<div class="tablenav bottom">' + response.data.pagination_html + '</div>';
+                                } else {
+                                    paginationBottomContainer.innerHTML = '';
+                                }
+                            }
                             
                             // Update total students display
-                            document.getElementById('total-students-display').innerHTML = 'Tổng: <strong>' + response.data.total_students + '</strong> học viên';
+                            var totalStudentsDisplay = document.getElementById('total-students-display');
+                            if (totalStudentsDisplay) {
+                                totalStudentsDisplay.innerHTML = 'Tổng: <strong>' + response.data.total_students + '</strong> học viên';
+                            }
+                            
+                            // Update per_page selector
+                            var perPageSelector = document.getElementById('per-page-selector');
+                            if (perPageSelector) {
+                                perPageSelector.value = response.data.per_page;
+                            }
                             
                             // Update current state
                             currentPage = response.data.current_page;
