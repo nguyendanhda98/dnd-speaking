@@ -47,7 +47,7 @@ class DND_Speaking_Email_Notifications {
         $message .= "- Thời gian: {$formatted_time}\n";
         $message .= "- Trạng thái: Đang chờ xác nhận\n\n";
         $message .= "Vui lòng vào hệ thống để xác nhận hoặc từ chối buổi học này.\n\n";
-        $message .= "Link quản lý: " . home_url('/teacher-dashboard') . "\n\n";
+        $message .= "Link quản lý: " . home_url('/') . "\n\n";
         $message .= "Trân trọng,\n";
         $message .= "DND Speaking Team";
         
@@ -147,7 +147,7 @@ class DND_Speaking_Email_Notifications {
         $message .= "- Thời gian: {$formatted_time}\n";
         $message .= "- Trạng thái: Đã xác nhận\n\n";
         $message .= "Vui lòng có mặt đúng giờ. Giáo viên sẽ bắt đầu buổi học và gửi link phòng học Discord cho bạn.\n\n";
-        $message .= "Link quản lý buổi học: " . home_url('/my-sessions') . "\n\n";
+        $message .= "Link quản lý buổi học: " . home_url('/') . "\n\n";
         $message .= "Chúc bạn có buổi học vui vẻ!\n\n";
         $message .= "Trân trọng,\n";
         $message .= "DND Speaking Team";
@@ -199,7 +199,7 @@ class DND_Speaking_Email_Notifications {
         $message .= "- Thời gian: {$formatted_time}\n";
         $message .= "- Trạng thái trước đó: " . $this->get_status_label($session_status) . "\n\n";
         $message .= "Credits của bạn đã được hoàn lại. Bạn có thể đặt buổi học khác với giáo viên khác.\n\n";
-        $message .= "Link đặt buổi học: " . home_url('/book-session') . "\n\n";
+        $message .= "Link đặt buổi học: " . home_url('/') . "\n\n";
         $message .= "Xin lỗi vì sự bất tiện này.\n\n";
         $message .= "Trân trọng,\n";
         $message .= "DND Speaking Team";
