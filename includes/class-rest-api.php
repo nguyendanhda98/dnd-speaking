@@ -791,21 +791,8 @@ class DND_Speaking_REST_API {
         $now = current_time('timestamp');
         $start_date = date('Y-m-d', $now);
         
-        // Calculate end date: only show up to next Thursday
-        // If today is Friday (5), Saturday (6), or Sunday (7), show until Thursday of next week
-        // Otherwise show until Thursday of current week
-        $current_day_of_week = date('N', $now); // 1=Monday, 2=Tuesday, ..., 5=Friday, 6=Saturday, 7=Sunday
-        
-        // Calculate days until next Thursday (4 = Thursday)
-        if ($current_day_of_week <= 4) {
-            // Monday to Thursday: show until Thursday this week
-            $days_to_add = 4 - $current_day_of_week;
-        } else {
-            // Friday to Sunday: show until Thursday next week
-            $days_to_add = (7 - $current_day_of_week) + 4;
-        }
-        
-        $end_date = date('Y-m-d', strtotime("+{$days_to_add} days", $now));
+        // Show availability for next 7 days from today
+        $end_date = date('Y-m-d', strtotime('+6 days', $now));
 
         // Get teacher's available days from weekly schedule (1=Monday, 7=Sunday)
         $weekly_schedule = get_user_meta($teacher_id, 'dnd_weekly_schedule', true);
