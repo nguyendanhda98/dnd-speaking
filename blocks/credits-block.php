@@ -42,13 +42,13 @@ class DND_Speaking_Credits_Block {
 
     public function render_block($attributes) {
         if (!is_user_logged_in()) {
-            return '<div class="dnd-credits-display">Vui lòng đăng nhập để xem số buổi.</div>';
+            return '<div class="dnd-credits-display">Vui lòng đăng nhập để xem số buổi học.</div>';
         }
 
         $user_id = get_current_user_id();
-        $credits = DND_Speaking_Helpers::get_user_credits($user_id);
+        $lessons = DND_Speaking_Helpers::get_user_lessons($user_id);
 
-        return '<div class="dnd-credits-display">Số buổi hiện có: <strong>' . $credits . '</strong></div>';
+        return '<div class="dnd-credits-display">Số buổi học hiện có: <strong>' . $lessons . '</strong></div>';
     }
 }
 

@@ -454,14 +454,14 @@ jQuery(document).ready(function($) {
                     successCallback();
                 } else {
                     // No credits
-                    alert('Bạn không đủ số buổi học. Vui lòng nạp thêm buổi học để tiếp tục.');
+                    alert('Bạn không đủ số buổi học. Vui lòng nạp thêm để tiếp tục.');
                     if (failCallback) {
                         failCallback();
                     }
                 }
             },
             error: function(xhr) {
-                console.error('Error checking credits:', xhr);
+                console.error('Error checking lessons:', xhr);
                 alert('Không thể kiểm tra số buổi học. Vui lòng thử lại.');
                 if (failCallback) {
                     failCallback();

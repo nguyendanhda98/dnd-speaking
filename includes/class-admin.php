@@ -10,13 +10,15 @@ class DND_Speaking_Admin {
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_notices', [$this, 'display_admin_notices']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
-        add_action('admin_post_add_credits', [$this, 'handle_add_credits']);
+        add_action('admin_post_bulk_add_lessons', [$this, 'handle_bulk_add_lessons']);
+        add_action('admin_post_bulk_remove_lessons', [$this, 'handle_bulk_remove_lessons']);
         add_action('wp_ajax_update_teacher_availability', [$this, 'update_teacher_availability']);
         add_action('wp_ajax_handle_teacher_request', [$this, 'handle_teacher_request']);
         add_action('wp_ajax_handle_upcoming_session', [$this, 'handle_upcoming_session']);
         add_action('wp_ajax_save_teacher_schedule', [$this, 'save_teacher_schedule']);
         add_action('wp_ajax_get_pages', [$this, 'get_pages']);
         add_filter('pre_update_option_dnd_discord_bot_token', [$this, 'validate_discord_bot_token'], 10, 2);
+        add_action('user_register', [$this, 'auto_assign_lessons_to_new_user']);
     }
 
     public function add_admin_menu() {
@@ -88,29 +90,66 @@ class DND_Speaking_Admin {
     public function students_page() {
         global $wpdb;
         $table = $wpdb->prefix . 'dnd_speaking_credits';
-        $students = $wpdb->get_results("SELECT * FROM $table ORDER BY credits DESC");
-
-        if (isset($_GET['added'])) {
-            echo '<div class="notice notice-success is-dismissible"><p>Credits added successfully.</p></div>';
+        
+        // Check if viewing specific student details
+        if (isset($_GET['student_id'])) {
+            $this->student_details_page(intval($_GET['student_id']));
+            return;
         }
         
+        $students = $wpdb->get_results("SELECT * FROM $table ORDER BY credits DESC");
+
+        // Display notices
+        if (isset($_GET['bulk_added'])) {
+            $count = intval($_GET['bulk_added']);
+            echo '<div class="notice notice-success is-dismissible"><p>✅ Đã thêm buổi học cho <strong>' . $count . '</strong> học viên.</p></div>';
+        }
+        if (isset($_GET['bulk_removed'])) {
+            $count = intval($_GET['bulk_removed']);
+            echo '<div class="notice notice-success is-dismissible"><p>✅ Đã trừ buổi học cho <strong>' . $count . '</strong> học viên.</p></div>';
+        }
         if (isset($_GET['error'])) {
-            echo '<div class="notice notice-error is-dismissible"><p>Failed to add credits. Please check the logs for more details.</p></div>';
+            echo '<div class="notice notice-error is-dismissible"><p>❌ Có lỗi xảy ra. Vui lòng kiểm tra logs.</p></div>';
         }
 
         ?>
         <div class="wrap">
-            <h1>Students</h1>
-            <h2>Add Credits</h2>
-            <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
-                <input type="hidden" name="action" value="add_credits">
-                <?php wp_nonce_field('add_credits_nonce'); ?>
+            <h1>Quản Lý Học Viên</h1>
+            
+            <!-- Manage Lessons Form -->
+            <h2>Quản Lý Buổi Học</h2>
+            <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" id="manage-lessons-form">
+                <input type="hidden" name="action" id="manage-action" value="bulk_add_lessons">
+                <?php wp_nonce_field('bulk_lessons_nonce'); ?>
+                
+                <!-- Hidden field to store selected user IDs -->
+                <input type="hidden" name="user_ids_hidden" id="user_ids_hidden" value="">
+                
                 <table class="form-table">
                     <tr>
-                        <th><label for="user_id">Select Student</label></th>
+                        <th><label>Chọn Học Viên</label></th>
                         <td>
-                            <select name="user_id" id="user_id" required>
-                                <option value="">Choose a student...</option>
+                            <!-- Search Box -->
+                            <div style="margin-bottom: 10px;">
+                                <input type="text" id="student_search" placeholder="Tìm kiếm học viên (nhập tên hoặc username)..." style="width: 400px; padding: 5px;">
+                            </div>
+                            
+                            <!-- Search Results -->
+                            <div id="search_results" style="display: none; border: 1px solid #ddd; max-height: 200px; overflow-y: auto; width: 400px; background: white; margin-bottom: 10px;">
+                                <!-- Results will be populated here -->
+                            </div>
+                            
+                            <!-- Selected Students -->
+                            <div id="selected_students" style="border: 1px solid #ddd; min-height: 100px; max-height: 300px; overflow-y: auto; width: 400px; padding: 10px; background: #f9f9f9;">
+                                <div id="selected_students_list">
+                                    <p style="color: #666; font-style: italic;">Chưa chọn học viên nào. Sử dụng ô tìm kiếm bên trên để thêm học viên.</p>
+                                </div>
+                            </div>
+                            <p class="description">Tìm kiếm và click vào học viên để thêm vào danh sách đã chọn</p>
+                            
+                            <!-- All users data for JavaScript -->
+                            <script type="text/javascript">
+                            var allStudents = [
                                 <?php
                                 // Get all users except administrators
                                 $users = get_users([
@@ -118,38 +157,263 @@ class DND_Speaking_Admin {
                                     'orderby' => 'display_name',
                                     'order' => 'ASC'
                                 ]);
+                                $student_data = [];
                                 foreach ($users as $user) {
-                                    echo '<option value="' . esc_attr($user->ID) . '">' . esc_html($user->display_name) . ' (' . esc_html($user->user_login) . ')</option>';
+                                    $current_lessons = DND_Speaking_Helpers::get_user_lessons($user->ID);
+                                    $student_data[] = sprintf(
+                                        '{id: %d, name: "%s", username: "%s", lessons: %d}',
+                                        $user->ID,
+                                        esc_js($user->display_name),
+                                        esc_js($user->user_login),
+                                        $current_lessons
+                                    );
                                 }
+                                echo implode(",\n                                ", $student_data);
                                 ?>
-                            </select>
+                            ];
+                            </script>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="credits">Credits to Add</label></th>
-                        <td><input type="number" name="credits" id="credits" required min="1"></td>
+                        <th><label for="credits">Số Buổi Học</label></th>
+                        <td>
+                            <input type="number" name="credits" id="credits" required min="1" value="1" style="width: 100px;">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="apply_to_all">Áp Dụng Cho Toàn Bộ</label></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="apply_to_all" id="apply_to_all" value="1">
+                                Áp dụng cho toàn bộ học viên (bỏ qua lựa chọn bên trên)
+                            </label>
+                            <p class="description" style="color: #d63638;">
+                                <strong>⚠️ Cẩn thận:</strong> Khi chọn option này, buổi học sẽ được thêm/trừ cho TẤT CẢ học viên trong hệ thống!
+                            </p>
+                        </td>
                     </tr>
                 </table>
-                <?php submit_button('Add Credits'); ?>
+                
+                <p class="submit">
+                    <button type="submit" name="submit" class="button button-primary" onclick="return handleAddLessons()">
+                        ➕ Thêm Buổi Học
+                    </button>
+                    <button type="button" class="button button-secondary" onclick="handleRemoveLessons()" style="margin-left: 10px;">
+                        ➖ Trừ Buổi Học
+                    </button>
+                </p>
             </form>
+            
+            <style type="text/css">
+            .search-result-item {
+                padding: 8px 10px;
+                cursor: pointer;
+                border-bottom: 1px solid #eee;
+            }
+            .search-result-item:hover {
+                background-color: #f0f0f0;
+            }
+            .selected-student-tag {
+                display: inline-block;
+                background: #0073aa;
+                color: white;
+                padding: 5px 10px;
+                margin: 5px 5px 5px 0;
+                border-radius: 3px;
+                font-size: 13px;
+            }
+            .selected-student-tag .remove-student {
+                margin-left: 8px;
+                cursor: pointer;
+                font-weight: bold;
+                color: #fff;
+            }
+            .selected-student-tag .remove-student:hover {
+                color: #ff6b6b;
+            }
+            </style>
+            
+            <script type="text/javascript">
+            // Selected students array
+            var selectedStudents = [];
+            
+            // Search functionality
+            document.getElementById('student_search').addEventListener('input', function(e) {
+                var searchTerm = e.target.value.toLowerCase().trim();
+                var resultsDiv = document.getElementById('search_results');
+                
+                if (searchTerm.length === 0) {
+                    resultsDiv.style.display = 'none';
+                    return;
+                }
+                
+                // Filter students
+                var filtered = allStudents.filter(function(student) {
+                    return student.name.toLowerCase().includes(searchTerm) || 
+                           student.username.toLowerCase().includes(searchTerm);
+                });
+                
+                // Display results
+                if (filtered.length === 0) {
+                    resultsDiv.innerHTML = '<div style="padding: 10px; color: #666;">Không tìm thấy học viên nào</div>';
+                    resultsDiv.style.display = 'block';
+                } else {
+                    var html = '';
+                    filtered.forEach(function(student) {
+                        // Check if already selected
+                        var isSelected = selectedStudents.some(function(s) { return s.id === student.id; });
+                        if (!isSelected) {
+                            html += '<div class="search-result-item" onclick="addStudent(' + student.id + ')">' +
+                                   '<strong>' + student.name + '</strong> (' + student.username + ')' +
+                                   '<span style="float: right; color: #666;">' + student.lessons + ' buổi</span>' +
+                                   '</div>';
+                        }
+                    });
+                    
+                    if (html === '') {
+                        resultsDiv.innerHTML = '<div style="padding: 10px; color: #666;">Tất cả kết quả đã được chọn</div>';
+                    } else {
+                        resultsDiv.innerHTML = html;
+                    }
+                    resultsDiv.style.display = 'block';
+                }
+            });
+            
+            // Hide search results when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#student_search') && !e.target.closest('#search_results')) {
+                    document.getElementById('search_results').style.display = 'none';
+                }
+            });
+            
+            // Add student to selection
+            function addStudent(studentId) {
+                var student = allStudents.find(function(s) { return s.id === studentId; });
+                if (!student) return;
+                
+                // Check if already selected
+                if (selectedStudents.some(function(s) { return s.id === studentId; })) {
+                    return;
+                }
+                
+                // Add to selected list
+                selectedStudents.push(student);
+                updateSelectedStudentsList();
+                
+                // Clear search
+                document.getElementById('student_search').value = '';
+                document.getElementById('search_results').style.display = 'none';
+            }
+            
+            // Remove student from selection
+            function removeStudent(studentId) {
+                selectedStudents = selectedStudents.filter(function(s) { return s.id !== studentId; });
+                updateSelectedStudentsList();
+            }
+            
+            // Update selected students display
+            function updateSelectedStudentsList() {
+                var listDiv = document.getElementById('selected_students_list');
+                var hiddenInput = document.getElementById('user_ids_hidden');
+                
+                if (selectedStudents.length === 0) {
+                    listDiv.innerHTML = '<p style="color: #666; font-style: italic;">Chưa chọn học viên nào. Sử dụng ô tìm kiếm bên trên để thêm học viên.</p>';
+                    hiddenInput.value = '';
+                } else {
+                    var html = '';
+                    var ids = [];
+                    selectedStudents.forEach(function(student) {
+                        html += '<span class="selected-student-tag">' +
+                               student.name + ' (' + student.lessons + ' buổi)' +
+                               '<span class="remove-student" onclick="removeStudent(' + student.id + ')">×</span>' +
+                               '</span>';
+                        ids.push(student.id);
+                    });
+                    listDiv.innerHTML = html;
+                    hiddenInput.value = ids.join(',');
+                }
+            }
+            
+            function handleAddLessons() {
+                var applyToAll = document.getElementById('apply_to_all').checked;
+                var credits = document.getElementById('credits').value;
+                
+                if (applyToAll) {
+                    var totalUsers = allStudents.length;
+                    if (!confirm('Bạn có chắc muốn THÊM ' + credits + ' buổi học cho TẤT CẢ ' + totalUsers + ' học viên không?')) {
+                        return false;
+                    }
+                } else if (selectedStudents.length === 0) {
+                    alert('Vui lòng chọn ít nhất một học viên hoặc tích "Áp dụng cho toàn bộ"');
+                    return false;
+                } else if (selectedStudents.length > 10) {
+                    if (!confirm('Bạn đã chọn ' + selectedStudents.length + ' học viên. Bạn có chắc muốn THÊM ' + credits + ' buổi học cho tất cả những người này không?')) {
+                        return false;
+                    }
+                }
+                
+                document.getElementById('manage-action').value = 'bulk_add_lessons';
+                return true;
+            }
+            
+            function handleRemoveLessons() {
+                var applyToAll = document.getElementById('apply_to_all').checked;
+                var credits = document.getElementById('credits').value;
+                
+                if (applyToAll) {
+                    var totalUsers = allStudents.length;
+                    if (!confirm('⚠️ CẢNH BÁO: Bạn có chắc muốn TRỪ ' + credits + ' buổi học từ TẤT CẢ ' + totalUsers + ' học viên không?\n\nHành động này không thể hoàn tác!')) {
+                        return false;
+                    }
+                } else if (selectedStudents.length === 0) {
+                    alert('Vui lòng chọn ít nhất một học viên hoặc tích "Áp dụng cho toàn bộ"');
+                    return false;
+                } else {
+                    if (!confirm('Bạn có chắc muốn TRỪ ' + credits + ' buổi học từ ' + selectedStudents.length + ' học viên đã chọn không?\n\nHọc viên không đủ số buổi sẽ bị bỏ qua.')) {
+                        return false;
+                    }
+                }
+                
+                document.getElementById('manage-action').value = 'bulk_remove_lessons';
+                document.getElementById('manage-lessons-form').submit();
+            }
+            </script>
 
-            <h2>Students List</h2>
+            <hr>
+
+            <!-- Students List -->
+            <h2>Danh Sách Học Viên</h2>
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
-                        <th>User ID</th>
-                        <th>Name</th>
-                        <th>Remaining Credits</th>
+                        <th style="width: 80px;">ID</th>
+                        <th>Tên</th>
+                        <th style="width: 120px;">Số Buổi Còn Lại</th>
+                        <th style="width: 150px;">Thao Tác</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($students as $student): ?>
+                    <?php if (empty($students)): ?>
                         <tr>
-                            <td><?php echo $student->user_id; ?></td>
-                            <td><?php echo get_user_by('id', $student->user_id)->display_name; ?></td>
-                            <td><?php echo $student->credits; ?></td>
+                            <td colspan="4" style="text-align: center;">Chưa có học viên nào</td>
                         </tr>
-                    <?php endforeach; ?>
+                    <?php else: ?>
+                        <?php foreach ($students as $student): 
+                            $user = get_user_by('id', $student->user_id);
+                            if (!$user) continue;
+                        ?>
+                            <tr>
+                                <td><?php echo $student->user_id; ?></td>
+                                <td><?php echo esc_html($user->display_name); ?></td>
+                                <td><strong><?php echo $student->credits; ?></strong></td>
+                                <td>
+                                    <a href="<?php echo admin_url('admin.php?page=dnd-speaking-students&student_id=' . $student->user_id); ?>" class="button button-primary">
+                                        Xem Chi Tiết
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -620,6 +884,7 @@ class DND_Speaking_Admin {
         register_setting('dnd_speaking_settings', 'dnd_session_duration');
         register_setting('dnd_speaking_settings', 'dnd_default_credits');
         register_setting('dnd_speaking_settings', 'dnd_teacher_role');
+        register_setting('dnd_speaking_settings', 'dnd_auto_assign_lessons');
         register_setting('dnd_speaking_settings', 'dnd_discord_client_id');
         register_setting('dnd_speaking_settings', 'dnd_discord_client_secret');
         register_setting('dnd_speaking_settings', 'dnd_discord_bot_token');
@@ -643,6 +908,14 @@ class DND_Speaking_Admin {
             'default_credits',
             'Default Credits for New Users',
             [$this, 'default_credits_field'],
+            'dnd_speaking_settings',
+            'dnd_speaking_main'
+        );
+
+        add_settings_field(
+            'auto_assign_lessons',
+            'Auto-Assign Lessons to New Users',
+            [$this, 'auto_assign_lessons_field'],
             'dnd_speaking_settings',
             'dnd_speaking_main'
         );
@@ -805,6 +1078,12 @@ class DND_Speaking_Admin {
         echo '<input type="number" name="dnd_default_credits" value="' . esc_attr($value) . '" />';
     }
 
+    public function auto_assign_lessons_field() {
+        $value = get_option('dnd_auto_assign_lessons', 0);
+        echo '<input type="number" name="dnd_auto_assign_lessons" value="' . esc_attr($value) . '" min="0" />';
+        echo '<p class="description">Số buổi học được tự động cấp cho user mới khi đăng ký. Đặt 0 để tắt tính năng này.</p>';
+    }
+
     public function teacher_role_field() {
         $value = get_option('dnd_teacher_role', 'teacher');
         $roles = wp_roles()->roles;
@@ -926,9 +1205,9 @@ class DND_Speaking_Admin {
         settings_errors('dnd_speaking_discord_settings');
     }
 
-    public function handle_add_credits() {
+    public function handle_bulk_add_lessons() {
         // Check nonce for security
-        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'add_credits_nonce')) {
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'bulk_lessons_nonce')) {
             wp_die('Security check failed');
         }
 
@@ -937,38 +1216,281 @@ class DND_Speaking_Admin {
             wp_die('Unauthorized');
         }
 
-        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+        $apply_to_all = isset($_POST['apply_to_all']) && $_POST['apply_to_all'] === '1';
         $credits = isset($_POST['credits']) ? intval($_POST['credits']) : 0;
 
-        // Validate input
-        if ($user_id <= 0 || $credits <= 0) {
-            wp_die('Invalid input: User ID and Credits must be positive numbers');
+        // Validate credits
+        if ($credits <= 0) {
+            wp_die('Invalid input: Please specify positive number of lessons');
         }
 
-        // Verify user exists
-        $user = get_user_by('id', $user_id);
-        if (!$user) {
-            wp_die('User not found');
+        // Get user IDs
+        if ($apply_to_all) {
+            // Get all users except administrators
+            $all_users = get_users([
+                'role__not_in' => ['administrator'],
+                'fields' => ['ID']
+            ]);
+            $user_ids = array_map(function($user) { return $user->ID; }, $all_users);
+        } else {
+            // Get from hidden field (comma-separated IDs)
+            $user_ids_string = isset($_POST['user_ids_hidden']) ? $_POST['user_ids_hidden'] : '';
+            if (empty($user_ids_string)) {
+                wp_die('Invalid input: Please select students or check "Apply to all"');
+            }
+            $user_ids = array_map('intval', explode(',', $user_ids_string));
         }
 
-        // Add credits using helper function
-        $result = DND_Speaking_Helpers::add_user_credits($user_id, $credits);
-
-        if ($result === false) {
-            // Log the action
-            DND_Speaking_Helpers::log_action(get_current_user_id(), 'add_credits_failed', "Failed to add $credits credits to user $user_id");
-            
-            // Redirect back with error message
-            wp_redirect(admin_url('admin.php?page=dnd-speaking-students&error=1'));
-            exit;
-        }
+        // Bulk add lessons
+        $results = DND_Speaking_Helpers::bulk_add_lessons($user_ids, $credits);
+        $success_count = count(array_filter($results));
 
         // Log the action
-        DND_Speaking_Helpers::log_action(get_current_user_id(), 'add_credits', "Added $credits credits to user $user_id");
+        $log_detail = $apply_to_all ? "Added $credits lessons to ALL students ($success_count total)" : "Added $credits lessons to $success_count selected students";
+        DND_Speaking_Helpers::log_action(get_current_user_id(), 'bulk_add_lessons', $log_detail);
 
         // Redirect back with success message
-        wp_redirect(admin_url('admin.php?page=dnd-speaking-students&added=1'));
+        wp_redirect(admin_url('admin.php?page=dnd-speaking-students&bulk_added=' . $success_count));
         exit;
+    }
+
+    public function handle_bulk_remove_lessons() {
+        // Check nonce for security
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'bulk_lessons_nonce')) {
+            wp_die('Security check failed');
+        }
+
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        $apply_to_all = isset($_POST['apply_to_all']) && $_POST['apply_to_all'] === '1';
+        $credits = isset($_POST['credits']) ? intval($_POST['credits']) : 0;
+
+        // Validate credits
+        if ($credits <= 0) {
+            wp_die('Invalid input: Please specify positive number of lessons');
+        }
+
+        // Get user IDs
+        if ($apply_to_all) {
+            // Get all users except administrators
+            $all_users = get_users([
+                'role__not_in' => ['administrator'],
+                'fields' => ['ID']
+            ]);
+            $user_ids = array_map(function($user) { return $user->ID; }, $all_users);
+        } else {
+            // Get from hidden field (comma-separated IDs)
+            $user_ids_string = isset($_POST['user_ids_hidden']) ? $_POST['user_ids_hidden'] : '';
+            if (empty($user_ids_string)) {
+                wp_die('Invalid input: Please select students or check "Apply to all"');
+            }
+            $user_ids = array_map('intval', explode(',', $user_ids_string));
+        }
+
+        // Bulk remove lessons
+        $results = DND_Speaking_Helpers::bulk_remove_lessons($user_ids, $credits);
+        $success_count = count(array_filter($results));
+
+        // Log the action
+        $log_detail = $apply_to_all ? "Removed $credits lessons from ALL students ($success_count succeeded)" : "Removed $credits lessons from $success_count selected students";
+        DND_Speaking_Helpers::log_action(get_current_user_id(), 'bulk_remove_lessons', $log_detail);
+
+        // Redirect back with success message
+        wp_redirect(admin_url('admin.php?page=dnd-speaking-students&bulk_removed=' . $success_count));
+        exit;
+    }
+
+    public function auto_assign_lessons_to_new_user($user_id) {
+        $auto_lessons = get_option('dnd_auto_assign_lessons', 0);
+        
+        if ($auto_lessons > 0) {
+            DND_Speaking_Helpers::add_user_lessons($user_id, $auto_lessons);
+            DND_Speaking_Helpers::log_action($user_id, 'auto_assign_lessons', "Auto-assigned $auto_lessons lessons to new user");
+        }
+    }
+
+    public function student_details_page($student_id) {
+        global $wpdb;
+        
+        // Get student info
+        $student = get_user_by('id', $student_id);
+        if (!$student) {
+            echo '<div class="wrap"><h1>Học viên không tồn tại</h1></div>';
+            return;
+        }
+
+        // Get current lessons
+        $current_lessons = DND_Speaking_Helpers::get_user_lessons($student_id);
+
+        // Get sessions history
+        $table_sessions = $wpdb->prefix . 'dnd_speaking_sessions';
+        $sessions = $wpdb->get_results($wpdb->prepare(
+            "SELECT s.*, 
+                    t.display_name as teacher_name 
+             FROM $table_sessions s
+             LEFT JOIN {$wpdb->users} t ON s.teacher_id = t.ID
+             WHERE s.student_id = %d
+             ORDER BY s.start_time DESC
+             LIMIT 50",
+            $student_id
+        ));
+
+        // Get logs
+        $table_logs = $wpdb->prefix . 'dnd_speaking_logs';
+        $logs = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $table_logs 
+             WHERE user_id = %d 
+             ORDER BY created_at DESC 
+             LIMIT 30",
+            $student_id
+        ));
+
+        // Calculate statistics
+        $total_sessions = count($sessions);
+        $completed_sessions = count(array_filter($sessions, function($s) { return $s->status === 'completed'; }));
+        $cancelled_sessions = count(array_filter($sessions, function($s) { return $s->status === 'cancelled'; }));
+
+        ?>
+        <div class="wrap">
+            <h1>Chi Tiết Học Viên: <?php echo esc_html($student->display_name); ?></h1>
+            <p>
+                <a href="<?php echo admin_url('admin.php?page=dnd-speaking-students'); ?>" class="button">
+                    ← Quay lại danh sách
+                </a>
+            </p>
+
+            <hr>
+
+            <!-- Student Info Card -->
+            <div style="background: #fff; padding: 20px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 20px;">
+                <h2>Thông Tin Cơ Bản</h2>
+                <table class="form-table">
+                    <tr>
+                        <th style="width: 200px;">ID:</th>
+                        <td><?php echo $student_id; ?></td>
+                    </tr>
+                    <tr>
+                        <th>Tên:</th>
+                        <td><?php echo esc_html($student->display_name); ?></td>
+                    </tr>
+                    <tr>
+                        <th>Email:</th>
+                        <td><?php echo esc_html($student->user_email); ?></td>
+                    </tr>
+                    <tr>
+                        <th>Username:</th>
+                        <td><?php echo esc_html($student->user_login); ?></td>
+                    </tr>
+                    <tr>
+                        <th>Số Buổi Học Còn Lại:</th>
+                        <td><strong style="font-size: 18px; color: #007cba;"><?php echo $current_lessons; ?></strong></td>
+                    </tr>
+                    <tr>
+                        <th>Ngày Đăng Ký:</th>
+                        <td><?php echo date_i18n('d/m/Y H:i', strtotime($student->user_registered)); ?></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Statistics Card -->
+            <div style="background: #fff; padding: 20px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 20px;">
+                <h2>Thống Kê</h2>
+                <table class="form-table">
+                    <tr>
+                        <th style="width: 200px;">Tổng Số Buổi Học:</th>
+                        <td><strong><?php echo $total_sessions; ?></strong></td>
+                    </tr>
+                    <tr>
+                        <th>Buổi Học Hoàn Thành:</th>
+                        <td><span style="color: green;"><strong><?php echo $completed_sessions; ?></strong></span></td>
+                    </tr>
+                    <tr>
+                        <th>Buổi Học Đã Hủy:</th>
+                        <td><span style="color: red;"><strong><?php echo $cancelled_sessions; ?></strong></span></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Sessions History -->
+            <div style="background: #fff; padding: 20px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 20px;">
+                <h2>Lịch Sử Buổi Học (50 buổi gần nhất)</h2>
+                <?php if (empty($sessions)): ?>
+                    <p>Chưa có buổi học nào.</p>
+                <?php else: ?>
+                    <table class="wp-list-table widefat fixed striped">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">ID</th>
+                                <th>Giáo Viên</th>
+                                <th>Thời Gian</th>
+                                <th style="width: 120px;">Trạng Thái</th>
+                                <th style="width: 100px;">Thời Lượng</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($sessions as $session): 
+                                $status_color = [
+                                    'completed' => 'green',
+                                    'cancelled' => 'red',
+                                    'active' => 'blue',
+                                    'pending' => 'orange',
+                                    'confirmed' => 'purple'
+                                ];
+                                $color = $status_color[$session->status] ?? 'gray';
+                                
+                                $status_text = [
+                                    'completed' => 'Hoàn thành',
+                                    'cancelled' => 'Đã hủy',
+                                    'active' => 'Đang học',
+                                    'pending' => 'Chờ xác nhận',
+                                    'confirmed' => 'Đã xác nhận'
+                                ];
+                                $status = $status_text[$session->status] ?? $session->status;
+                            ?>
+                                <tr>
+                                    <td><?php echo $session->id; ?></td>
+                                    <td><?php echo esc_html($session->teacher_name ?: 'N/A'); ?></td>
+                                    <td><?php echo $session->start_time ? date_i18n('d/m/Y H:i', strtotime($session->start_time)) : 'N/A'; ?></td>
+                                    <td><span style="color: <?php echo $color; ?>; font-weight: bold;"><?php echo $status; ?></span></td>
+                                    <td><?php echo $session->duration ? $session->duration . ' phút' : '-'; ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+
+            <!-- Activity Logs -->
+            <div style="background: #fff; padding: 20px; border: 1px solid #ccc; border-radius: 5px;">
+                <h2>Nhật Ký Hoạt Động (30 hoạt động gần nhất)</h2>
+                <?php if (empty($logs)): ?>
+                    <p>Chưa có hoạt động nào.</p>
+                <?php else: ?>
+                    <table class="wp-list-table widefat fixed striped">
+                        <thead>
+                            <tr>
+                                <th style="width: 150px;">Thời Gian</th>
+                                <th style="width: 200px;">Hành Động</th>
+                                <th>Chi Tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($logs as $log): ?>
+                                <tr>
+                                    <td><?php echo date_i18n('d/m/Y H:i:s', strtotime($log->created_at)); ?></td>
+                                    <td><code><?php echo esc_html($log->action); ?></code></td>
+                                    <td><?php echo esc_html($log->details); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php
     }
 
     public function update_teacher_availability() {

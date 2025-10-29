@@ -2,7 +2,7 @@ const { registerBlockType } = wp.blocks;
 const { useBlockProps } = wp.blockEditor;
 
 registerBlockType('dnd-speaking/credits-display', {
-    title: 'DND Credits Display',
+    title: 'DND Lessons Display',
     icon: 'money',
     category: 'widgets',
     edit: function(props) {
@@ -11,7 +11,7 @@ registerBlockType('dnd-speaking/credits-display', {
         return wp.element.createElement(
             'div',
             blockProps,
-            wp.element.createElement('div', { className: 'dnd-credits-display' }, 'Số buổi hiện có: Preview')
+            wp.element.createElement('div', { className: 'dnd-credits-display' }, 'Số buổi học hiện có: Preview')
         );
     },
     save: function() {

@@ -133,4 +133,44 @@ class DND_Speaking_Helpers {
             'details' => $details
         ]);
     }
+
+    // Alias functions for "lessons" terminology (UI-friendly)
+    public static function get_user_lessons($user_id) {
+        return self::get_user_credits($user_id);
+    }
+
+    public static function add_user_lessons($user_id, $amount) {
+        return self::add_user_credits($user_id, $amount);
+    }
+
+    public static function deduct_user_lessons($user_id, $amount = 1) {
+        return self::deduct_user_credits($user_id, $amount);
+    }
+
+    public static function refund_user_lessons($user_id, $amount = 1, $reason = '') {
+        return self::refund_user_credits($user_id, $amount, $reason);
+    }
+
+    // Bulk add lessons to multiple students
+    public static function bulk_add_lessons($user_ids, $amount) {
+        $results = [];
+        foreach ($user_ids as $user_id) {
+            $results[$user_id] = self::add_user_credits($user_id, $amount);
+        }
+        return $results;
+    }
+
+    // Bulk remove lessons from multiple students
+    public static function bulk_remove_lessons($user_ids, $amount) {
+        $results = [];
+        foreach ($user_ids as $user_id) {
+            $current = self::get_user_credits($user_id);
+            if ($current >= $amount) {
+                $results[$user_id] = self::deduct_user_credits($user_id, $amount);
+            } else {
+                $results[$user_id] = false; // Not enough lessons
+            }
+        }
+        return $results;
+    }
 }
