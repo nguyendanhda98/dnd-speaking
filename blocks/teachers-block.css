@@ -54,18 +54,17 @@
 }
 
 .dnd-teacher-details {
-    width: 60px;
-    min-width: 60px;
-    max-width: 60px;
+    flex: 1;
     text-align: left;
     display: flex !important;
     flex-direction: column !important;
     justify-content: center;
     order: 2;
+    overflow: hidden;
 }
 
 .dnd-teacher-name {
-    font-size: 13px;
+    font-size: 15px;
     font-weight: bold;
     margin: 0 !important;
     padding: 0 !important;
@@ -77,7 +76,7 @@
 }
 
 .dnd-teacher-status {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: normal;
     margin: 2px 0 0 0 !important;
     padding: 0 !important;
