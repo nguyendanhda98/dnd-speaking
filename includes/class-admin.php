@@ -26,6 +26,8 @@ class DND_Speaking_Admin {
         add_action('admin_post_add_listening_session_admin', [$this, 'handle_add_listening_session']);
         add_action('admin_post_edit_listening_session_admin', [$this, 'handle_edit_listening_session']);
         add_action('admin_post_delete_listening_session_admin', [$this, 'handle_delete_listening_session']);
+        add_action('wp_ajax_search_teachers_ls', [$this, 'ajax_search_teachers_ls']);
+        add_action('wp_ajax_search_students_ls', [$this, 'ajax_search_students_ls']);
     }
 
     public function add_admin_menu() {
@@ -2934,144 +2936,168 @@ class DND_Speaking_Admin {
         
         <script type="text/javascript">
         jQuery(document).ready(function($) {
-            // Data arrays
-            var allTeachers = [
-                <?php
-                $teacher_data = [];
-                foreach ($teachers as $teacher) {
-                    $teacher_data[] = sprintf(
-                        '{id: %d, name: "%s", email: "%s"}',
-                        $teacher->ID,
-                        esc_js($teacher->display_name),
-                        esc_js($teacher->user_email)
-                    );
-                }
-                echo implode(",\n                ", $teacher_data);
-                ?>
-            ];
-            
-            var allStudentsLS = [
-                <?php
-                $student_data = [];
-                foreach ($students as $student) {
-                    $student_data[] = sprintf(
-                        '{id: %d, name: "%s", email: "%s"}',
-                        $student->ID,
-                        esc_js($student->display_name),
-                        esc_js($student->user_email)
-                    );
-                }
-                echo implode(",\n                ", $student_data);
-                ?>
-            ];
-            
             var selectedTeachers = [];
             var selectedStudentsLS = [];
-            
-            // Debug: Check if data is loaded
-            console.log('All Teachers:', allTeachers.length, allTeachers);
-            console.log('All Students:', allStudentsLS.length, allStudentsLS);
+            var searchTimeout = null;
             
             // Initialize with existing data in edit mode
             <?php if ($edit_mode): 
                 $teacher_ids_edit = isset($edit_session['teacher_ids']) ? $edit_session['teacher_ids'] : (isset($edit_session['teacher_id']) ? [$edit_session['teacher_id']] : []);
                 foreach ($teacher_ids_edit as $tid):
+                    $teacher = get_userdata($tid);
+                    if ($teacher):
             ?>
-                var existingTeacher = allTeachers.find(function(t) { return t.id === <?php echo intval($tid); ?>; });
-                if (existingTeacher) {
-                    selectedTeachers.push(existingTeacher);
-                }
+                selectedTeachers.push({
+                    id: <?php echo intval($tid); ?>,
+                    name: '<?php echo esc_js($teacher->display_name); ?>',
+                    email: '<?php echo esc_js($teacher->user_email); ?>'
+                });
             <?php 
+                    endif;
                 endforeach;
             endif; ?>
             
             <?php if ($edit_mode): 
                 $student_ids_edit = isset($edit_session['student_ids']) ? $edit_session['student_ids'] : (isset($edit_session['student_id']) ? [$edit_session['student_id']] : []);
                 foreach ($student_ids_edit as $sid):
+                    $student = get_userdata($sid);
+                    if ($student):
             ?>
-                var existingStudent = allStudentsLS.find(function(s) { return s.id === <?php echo intval($sid); ?>; });
-                if (existingStudent) {
-                    selectedStudentsLS.push(existingStudent);
-                }
+                selectedStudentsLS.push({
+                    id: <?php echo intval($sid); ?>,
+                    name: '<?php echo esc_js($student->display_name); ?>',
+                    email: '<?php echo esc_js($student->user_email); ?>'
+                });
             <?php 
+                    endif;
                 endforeach;
             endif; ?>
             
-            // Teacher Search
+            // Teacher Search with AJAX
             $('#teacher_search').on('input', function() {
-                var searchTerm = $(this).val().toLowerCase().trim();
+                var searchTerm = $(this).val().trim();
                 var resultsDiv = $('#teacher_search_results');
                 
-                if (searchTerm.length === 0) {
-                    resultsDiv.hide();
+                // Clear previous timeout
+                if (searchTimeout) {
+                    clearTimeout(searchTimeout);
+                }
+                
+                if (searchTerm.length < 2) {
+                    resultsDiv.html('<div style="padding: 10px; color: #666;">Nhập ít nhất 2 ký tự để tìm kiếm...</div>').show();
                     return;
                 }
                 
-                var filtered = allTeachers.filter(function(teacher) {
-                    return teacher.name.toLowerCase().includes(searchTerm) || 
-                           teacher.email.toLowerCase().includes(searchTerm);
-                });
+                resultsDiv.html('<div style="padding: 10px; color: #666;">Đang tìm kiếm...</div>').show();
                 
-                if (filtered.length === 0) {
-                    resultsDiv.html('<div style="padding: 10px; color: #666;">Không tìm thấy giáo viên nào</div>').show();
-                } else {
-                    var html = '';
-                    filtered.forEach(function(teacher) {
-                        var isSelected = selectedTeachers.some(function(t) { return t.id === teacher.id; });
-                        var selectedClass = isSelected ? ' style="background: #e8f5e9; pointer-events: none; opacity: 0.6;"' : '';
-                        var selectedText = isSelected ? ' <span style="color: #4caf50; font-weight: bold;">(✓ Đã chọn)</span>' : '';
-                        
-                        html += '<div class="search-result-item-ls" data-teacher-id="' + teacher.id + '"' + selectedClass + '>' +
-                               '<strong>' + teacher.name + '</strong>' + selectedText + '<br>' +
-                               '<small style="color: #666;">' + teacher.email + '</small>' +
-                               '</div>';
+                // Debounce search
+                searchTimeout = setTimeout(function() {
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'search_teachers_ls',
+                            nonce: '<?php echo wp_create_nonce('dnd_admin_nonce'); ?>',
+                            search: searchTerm
+                        },
+                        success: function(response) {
+                            if (response.success && response.data.results) {
+                                var results = response.data.results;
+                                
+                                if (results.length === 0) {
+                                    resultsDiv.html('<div style="padding: 10px; color: #666;">Không tìm thấy giáo viên nào</div>');
+                                } else {
+                                    var html = '';
+                                    results.forEach(function(teacher) {
+                                        var isSelected = selectedTeachers.some(function(t) { return t.id === teacher.id; });
+                                        var selectedClass = isSelected ? ' style="background: #e8f5e9; pointer-events: none; opacity: 0.6;"' : '';
+                                        var selectedText = isSelected ? ' <span style="color: #4caf50; font-weight: bold;">(✓ Đã chọn)</span>' : '';
+                                        
+                                        html += '<div class="search-result-item-ls" data-teacher-id="' + teacher.id + '"' + selectedClass + '>' +
+                                               '<strong>' + teacher.name + '</strong>' + selectedText + '<br>' +
+                                               '<small style="color: #666;">' + teacher.email + '</small>' +
+                                               '</div>';
+                                    });
+                                    resultsDiv.html(html);
+                                }
+                                resultsDiv.show();
+                            }
+                        },
+                        error: function() {
+                            resultsDiv.html('<div style="padding: 10px; color: #d32f2f;">Lỗi khi tìm kiếm</div>');
+                        }
                     });
-                    
-                    resultsDiv.html(html);
-                    resultsDiv.show();
-                }
+                }, 300); // Wait 300ms after user stops typing
             });
             
-            // Student Search
+            // Student Search with AJAX
             $('#student_search_ls').on('input', function() {
-                var searchTerm = $(this).val().toLowerCase().trim();
+                var searchTerm = $(this).val().trim();
                 var resultsDiv = $('#student_search_results');
                 
-                if (searchTerm.length === 0) {
-                    resultsDiv.hide();
+                // Clear previous timeout
+                if (searchTimeout) {
+                    clearTimeout(searchTimeout);
+                }
+                
+                if (searchTerm.length < 2) {
+                    resultsDiv.html('<div style="padding: 10px; color: #666;">Nhập ít nhất 2 ký tự để tìm kiếm...</div>').show();
                     return;
                 }
                 
-                var filtered = allStudentsLS.filter(function(student) {
-                    return student.name.toLowerCase().includes(searchTerm) || 
-                           student.email.toLowerCase().includes(searchTerm);
-                });
+                resultsDiv.html('<div style="padding: 10px; color: #666;">Đang tìm kiếm...</div>').show();
                 
-                if (filtered.length === 0) {
-                    resultsDiv.html('<div style="padding: 10px; color: #666;">Không tìm thấy học viên nào</div>').show();
-                } else {
-                    var html = '';
-                    filtered.forEach(function(student) {
-                        var isSelected = selectedStudentsLS.some(function(s) { return s.id === student.id; });
-                        var selectedClass = isSelected ? ' style="background: #e8f5e9; pointer-events: none; opacity: 0.6;"' : '';
-                        var selectedText = isSelected ? ' <span style="color: #4caf50; font-weight: bold;">(✓ Đã chọn)</span>' : '';
-                        
-                        html += '<div class="search-result-item-ls" data-student-id="' + student.id + '"' + selectedClass + '>' +
-                               '<strong>' + student.name + '</strong>' + selectedText + '<br>' +
-                               '<small style="color: #666;">' + student.email + '</small>' +
-                               '</div>';
+                // Debounce search
+                searchTimeout = setTimeout(function() {
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'search_students_ls',
+                            nonce: '<?php echo wp_create_nonce('dnd_admin_nonce'); ?>',
+                            search: searchTerm
+                        },
+                        success: function(response) {
+                            if (response.success && response.data.results) {
+                                var results = response.data.results;
+                                
+                                if (results.length === 0) {
+                                    resultsDiv.html('<div style="padding: 10px; color: #666;">Không tìm thấy học viên nào</div>');
+                                } else {
+                                    var html = '';
+                                    results.forEach(function(student) {
+                                        var isSelected = selectedStudentsLS.some(function(s) { return s.id === student.id; });
+                                        var selectedClass = isSelected ? ' style="background: #e8f5e9; pointer-events: none; opacity: 0.6;"' : '';
+                                        var selectedText = isSelected ? ' <span style="color: #4caf50; font-weight: bold;">(✓ Đã chọn)</span>' : '';
+                                        
+                                        html += '<div class="search-result-item-ls" data-student-id="' + student.id + '"' + selectedClass + '>' +
+                                               '<strong>' + student.name + '</strong>' + selectedText + '<br>' +
+                                               '<small style="color: #666;">' + student.email + '</small>' +
+                                               '</div>';
+                                    });
+                                    resultsDiv.html(html);
+                                }
+                                resultsDiv.show();
+                            }
+                        },
+                        error: function() {
+                            resultsDiv.html('<div style="padding: 10px; color: #d32f2f;">Lỗi khi tìm kiếm</div>');
+                        }
                     });
-                    
-                    resultsDiv.html(html);
-                    resultsDiv.show();
-                }
+                }, 300); // Wait 300ms after user stops typing
             });
             
             // Click handlers for search results
             $(document).on('click', '[data-teacher-id]', function() {
+                if ($(this).css('pointer-events') === 'none') return; // Already selected
+                
                 var teacherId = parseInt($(this).data('teacher-id'));
-                var teacher = allTeachers.find(function(t) { return t.id === teacherId; });
-                if (teacher && !selectedTeachers.some(function(t) { return t.id === teacherId; })) {
+                var teacherName = $(this).find('strong').text().replace(' (✓ Đã chọn)', '');
+                var teacherEmail = $(this).find('small').text();
+                
+                var teacher = {id: teacherId, name: teacherName, email: teacherEmail};
+                
+                if (!selectedTeachers.some(function(t) { return t.id === teacherId; })) {
                     selectedTeachers.push(teacher);
                     updateSelectedTeachers();
                     $('#teacher_search').val('');
@@ -3080,9 +3106,15 @@ class DND_Speaking_Admin {
             });
             
             $(document).on('click', '[data-student-id]', function() {
+                if ($(this).css('pointer-events') === 'none') return; // Already selected
+                
                 var studentId = parseInt($(this).data('student-id'));
-                var student = allStudentsLS.find(function(s) { return s.id === studentId; });
-                if (student && !selectedStudentsLS.some(function(s) { return s.id === studentId; })) {
+                var studentName = $(this).find('strong').text().replace(' (✓ Đã chọn)', '');
+                var studentEmail = $(this).find('small').text();
+                
+                var student = {id: studentId, name: studentName, email: studentEmail};
+                
+                if (!selectedStudentsLS.some(function(s) { return s.id === studentId; })) {
                     selectedStudentsLS.push(student);
                     updateSelectedStudents();
                     $('#student_search_ls').val('');
@@ -3319,6 +3351,89 @@ class DND_Speaking_Admin {
         
         wp_redirect(add_query_arg('deleted', '1', admin_url('admin.php?page=dnd-speaking-listening-sessions')));
         exit;
+    }
+
+    /**
+     * AJAX: Search teachers for listening sessions
+     */
+    public function ajax_search_teachers_ls() {
+        check_ajax_referer('dnd_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Unauthorized');
+        }
+        
+        $search_term = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
+        
+        if (strlen($search_term) < 2) {
+            wp_send_json_success(['results' => []]);
+        }
+        
+        $args = [
+            'role' => 'teacher',
+            'search' => '*' . $search_term . '*',
+            'search_columns' => ['user_login', 'user_email', 'display_name'],
+            'number' => 20 // Limit results
+        ];
+        
+        $teachers = get_users($args);
+        $results = [];
+        
+        foreach ($teachers as $teacher) {
+            $results[] = [
+                'id' => $teacher->ID,
+                'name' => $teacher->display_name,
+                'email' => $teacher->user_email
+            ];
+        }
+        
+        wp_send_json_success(['results' => $results]);
+    }
+
+    /**
+     * AJAX: Search students for listening sessions
+     */
+    public function ajax_search_students_ls() {
+        global $wpdb;
+        check_ajax_referer('dnd_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Unauthorized');
+        }
+        
+        $search_term = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
+        
+        if (strlen($search_term) < 2) {
+            wp_send_json_success(['results' => []]);
+        }
+        
+        // Get students with credits
+        $table = $wpdb->prefix . 'dnd_speaking_credits';
+        $student_ids = $wpdb->get_col("SELECT DISTINCT user_id FROM $table");
+        
+        if (empty($student_ids)) {
+            wp_send_json_success(['results' => []]);
+        }
+        
+        $args = [
+            'include' => $student_ids,
+            'search' => '*' . $search_term . '*',
+            'search_columns' => ['user_login', 'user_email', 'display_name'],
+            'number' => 20 // Limit results
+        ];
+        
+        $students = get_users($args);
+        $results = [];
+        
+        foreach ($students as $student) {
+            $results[] = [
+                'id' => $student->ID,
+                'name' => $student->display_name,
+                'email' => $student->user_email
+            ];
+        }
+        
+        wp_send_json_success(['results' => $results]);
     }
 
     /**
