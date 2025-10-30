@@ -6,29 +6,83 @@
 
 .dnd-teachers-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    padding: 20px 0;
 }
 
 .dnd-teacher-card {
     border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 15px;
+    border-radius: 12px;
     background: #fff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.dnd-teacher-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.dnd-teacher-info {
+    padding: 20px;
+}
+
+.dnd-teacher-header {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.dnd-teacher-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    order: 1;
+}
+
+.dnd-teacher-details {
+    width: 60px;
+    min-width: 60px;
+    max-width: 60px;
+    text-align: left;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center;
+    order: 2;
 }
 
 .dnd-teacher-name {
-    font-size: 18px;
+    font-size: 13px;
     font-weight: bold;
-    margin-bottom: 10px;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #333;
+    line-height: 1.3;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    display: block !important;
 }
 
 .dnd-teacher-status {
-    font-size: 14px;
-    color: #666;
-    margin-bottom: 15px;
+    font-size: 11px;
+    font-weight: normal;
+    margin: 2px 0 0 0 !important;
+    padding: 0 !important;
+    display: block !important;
+    line-height: 1.2;
 }
 
 .dnd-teacher-status.online {
@@ -39,23 +93,30 @@
     color: #0066cc;
 }
 
+.dnd-teacher-status:not(.online):not(.busy) {
+    color: #999;
+}
+
 .dnd-teacher-buttons {
     display: flex;
-    justify-content: center;
     gap: 10px;
+    margin-top: 15px;
 }
 
 .dnd-btn {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 8px 12px;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 15px;
+    font-weight: 600;
     text-decoration: none;
-    transition: background 0.3s;
+    transition: all 0.3s;
+    flex: 1;
 }
 
 .dnd-btn-book {
@@ -65,6 +126,8 @@
 
 .dnd-btn-book:hover {
     background: #005a87;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 124, 186, 0.3);
 }
 
 .dnd-btn-start {
@@ -74,6 +137,8 @@
 
 .dnd-btn-start:hover {
     background: #1e7e34;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
 }
 
 .dnd-btn:disabled {
@@ -216,4 +281,101 @@
     opacity: 0.6;
     cursor: not-allowed;
     pointer-events: none;
+}
+
+/* YouTube Video Embed - Full width at top */
+.dnd-teacher-video {
+    width: 100%;
+    margin: 0;
+    background: #000;
+}
+
+.dnd-video-wrapper {
+    position: relative;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    height: 0;
+    overflow: hidden;
+    background: #000;
+}
+
+.dnd-video-wrapper iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+/* Placeholder for teachers without video */
+.dnd-teacher-video-placeholder {
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dnd-teacher-video-placeholder::before {
+    content: '🎓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 64px;
+    opacity: 0.5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .dnd-teachers-list {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .dnd-teacher-avatar {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+    }
+    
+    .dnd-teacher-details {
+        flex: 0 1 50px;
+    }
+    
+    .dnd-teacher-name {
+        font-size: 14px;
+    }
+    
+    .dnd-teacher-status {
+        font-size: 11px;
+    }
+    
+    .dnd-teacher-info {
+        padding: 15px;
+    }
+    
+    .dnd-teacher-buttons {
+        flex-direction: column;
+    }
+    
+    .dnd-btn {
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1200px) {
+    .dnd-teachers-list {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+}
+
+@media (min-width: 1201px) {
+    .dnd-teachers-list {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }

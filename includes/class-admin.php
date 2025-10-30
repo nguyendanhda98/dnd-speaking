@@ -18,6 +18,7 @@ class DND_Speaking_Admin {
         add_action('wp_ajax_save_teacher_schedule', [$this, 'save_teacher_schedule']);
         add_action('wp_ajax_get_pages', [$this, 'get_pages']);
         add_action('wp_ajax_load_students_list', [$this, 'ajax_load_students_list']);
+        add_action('wp_ajax_save_teacher_youtube_url', [$this, 'save_teacher_youtube_url']);
         add_filter('pre_update_option_dnd_discord_bot_token', [$this, 'validate_discord_bot_token'], 10, 2);
         add_action('user_register', [$this, 'auto_assign_lessons_to_new_user']);
     }
@@ -830,6 +831,108 @@ class DND_Speaking_Admin {
                     <div class="dnd-stat-value"><?php echo $total_duration; ?> min</div>
                 </div>
             </div>
+            
+            <!-- YouTube Video Settings -->
+            <div class="dnd-youtube-settings" style="margin: 20px 0; padding: 20px; background: #fff; border: 1px solid #ccc; border-radius: 5px;">
+                <h2>YouTube Video Settings</h2>
+                <?php
+                $youtube_url = get_user_meta($teacher_id, 'dnd_youtube_url', true);
+                ?>
+                <form id="teacher-youtube-form" style="margin-top: 15px;">
+                    <input type="hidden" name="teacher_id" value="<?php echo $teacher_id; ?>">
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row">
+                                <label for="youtube_url">YouTube Video URL:</label>
+                            </th>
+                            <td>
+                                <input type="url" 
+                                       id="youtube_url" 
+                                       name="youtube_url" 
+                                       value="<?php echo esc_attr($youtube_url); ?>" 
+                                       class="regular-text"
+                                       placeholder="https://www.youtube.com/watch?v=...">
+                                <p class="description">
+                                    Enter the YouTube video URL for this teacher. Supported formats:
+                                    <br>• https://www.youtube.com/watch?v=VIDEO_ID
+                                    <br>• https://youtu.be/VIDEO_ID
+                                </p>
+                                <?php if ($youtube_url): ?>
+                                    <div style="margin-top: 15px;">
+                                        <strong>Preview:</strong><br>
+                                        <?php
+                                        // Extract video ID and show preview
+                                        $video_id = '';
+                                        if (preg_match('/youtube\.com\/watch\?v=([^&]+)/', $youtube_url, $matches)) {
+                                            $video_id = $matches[1];
+                                        } elseif (preg_match('/youtu\.be\/([^?]+)/', $youtube_url, $matches)) {
+                                            $video_id = $matches[1];
+                                        }
+                                        if ($video_id):
+                                        ?>
+                                            <div style="position: relative; padding-bottom: 56.25%; height: 0; max-width: 560px;">
+                                                <iframe 
+                                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+                                                    src="https://www.youtube.com/embed/<?php echo esc_attr($video_id); ?>" 
+                                                    frameborder="0" 
+                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                                    allowfullscreen>
+                                                </iframe>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    </table>
+                    <p class="submit">
+                        <button type="submit" class="button button-primary">Save YouTube URL</button>
+                        <span id="youtube-save-message" style="margin-left: 10px; color: green; display: none;">✓ Saved successfully!</span>
+                    </p>
+                </form>
+            </div>
+            
+            <script>
+            jQuery(document).ready(function($) {
+                $('#teacher-youtube-form').on('submit', function(e) {
+                    e.preventDefault();
+                    
+                    var $form = $(this);
+                    var $button = $form.find('button[type="submit"]');
+                    var $message = $('#youtube-save-message');
+                    
+                    $button.prop('disabled', true).text('Saving...');
+                    $message.hide();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        method: 'POST',
+                        data: {
+                            action: 'save_teacher_youtube_url',
+                            teacher_id: $form.find('[name="teacher_id"]').val(),
+                            youtube_url: $form.find('[name="youtube_url"]').val(),
+                            nonce: '<?php echo wp_create_nonce('save_teacher_youtube_url'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                $message.show();
+                                setTimeout(function() {
+                                    location.reload();
+                                }, 1000);
+                            } else {
+                                alert('Error: ' + (response.data || 'Unknown error'));
+                            }
+                        },
+                        error: function() {
+                            alert('An error occurred while saving.');
+                        },
+                        complete: function() {
+                            $button.prop('disabled', false).text('Save YouTube URL');
+                        }
+                    });
+                });
+            });
+            </script>
             
             <!-- Filters -->
             <div class="dnd-filters">
@@ -2332,5 +2435,53 @@ class DND_Speaking_Admin {
         // Redirect back to teachers page with success message
         wp_redirect(add_query_arg('updated', 'availability', admin_url('admin.php?page=dnd-speaking-teachers')));
         exit;
+    }
+
+    public function save_teacher_youtube_url() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'save_teacher_youtube_url')) {
+            wp_send_json_error('Security check failed');
+            return;
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+
+        $teacher_id = intval($_POST['teacher_id']);
+        $youtube_url = sanitize_text_field($_POST['youtube_url']);
+
+        // Validate YouTube URL format
+        if (!empty($youtube_url)) {
+            $valid_patterns = [
+                '/^https?:\/\/(www\.)?youtube\.com\/watch\?v=[\w-]+/',
+                '/^https?:\/\/youtu\.be\/[\w-]+/'
+            ];
+            
+            $is_valid = false;
+            foreach ($valid_patterns as $pattern) {
+                if (preg_match($pattern, $youtube_url)) {
+                    $is_valid = true;
+                    break;
+                }
+            }
+            
+            if (!$is_valid) {
+                wp_send_json_error('Invalid YouTube URL format. Please use: https://www.youtube.com/watch?v=... or https://youtu.be/...');
+                return;
+            }
+        }
+
+        // Update user meta
+        $result = update_user_meta($teacher_id, 'dnd_youtube_url', $youtube_url);
+
+        if ($result === false && get_user_meta($teacher_id, 'dnd_youtube_url', true) !== $youtube_url) {
+            wp_send_json_error('Failed to save YouTube URL');
+            return;
+        }
+
+        wp_send_json_success('YouTube URL saved successfully');
     }
 }

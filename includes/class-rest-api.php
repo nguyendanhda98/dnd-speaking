@@ -396,12 +396,26 @@ class DND_Speaking_REST_API {
         $teachers = [];
         foreach ($users as $user) {
             $available_status = get_user_meta($user->ID, 'dnd_available', true);
+            $youtube_url = get_user_meta($user->ID, 'dnd_youtube_url', true);
+            
+            // Extract video ID from YouTube URL
+            $youtube_video_id = '';
+            if (!empty($youtube_url)) {
+                if (preg_match('/youtube\.com\/watch\?v=([^&]+)/', $youtube_url, $matches)) {
+                    $youtube_video_id = $matches[1];
+                } elseif (preg_match('/youtu\.be\/([^?]+)/', $youtube_url, $matches)) {
+                    $youtube_video_id = $matches[1];
+                }
+            }
+            
             // Return status: '1' = online, 'busy' = busy, '' or other = offline
             $teachers[] = [
                 'id' => $user->ID,
                 'name' => $user->display_name,
                 'available' => $available_status === '1',
                 'status' => $available_status, // Return raw status for frontend display
+                'youtube_url' => $youtube_url,
+                'youtube_video_id' => $youtube_video_id,
             ];
         }
 
