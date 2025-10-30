@@ -1,0 +1,251 @@
+/* Listening Sessions Block Styles */
+
+.dnd-listening-sessions-block {
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin: 20px 0;
+}
+
+.dnd-listening-title {
+    font-size: 28px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Admin Link */
+.dnd-listening-admin-link {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.dnd-btn-admin {
+    background: #007cba;
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.dnd-btn-admin:hover {
+    background: #005a87;
+    color: white;
+}
+
+.dnd-input {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 100%;
+}
+
+.dnd-textarea {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 100%;
+    min-height: 80px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.dnd-input:focus,
+.dnd-textarea:focus {
+    outline: none;
+    border-color: #007cba;
+    box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.1);
+}
+
+.dnd-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.dnd-btn-primary {
+    background: #007cba;
+    color: white;
+}
+
+.dnd-btn-primary:hover {
+    background: #005a87;
+    transform: translateY(-1px);
+}
+
+.dnd-message {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    display: none;
+}
+
+.dnd-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    display: block;
+}
+
+.dnd-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    display: block;
+}
+
+/* Videos Grid */
+.dnd-listening-videos-container {
+    margin-top: 20px;
+}
+
+.dnd-no-videos {
+    text-align: center;
+    color: #666;
+    padding: 40px;
+    font-style: italic;
+}
+
+.dnd-videos-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.dnd-video-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.dnd-video-header {
+    padding: 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #ddd;
+}
+
+.dnd-video-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 12px 0;
+    line-height: 1.4;
+}
+
+.dnd-video-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 12px;
+}
+
+.dnd-meta-item {
+    display: inline-flex;
+    align-items: center;
+    font-size: 14px;
+    color: #666;
+    background: #fff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.dnd-video-description {
+    font-size: 14px;
+    color: #666;
+    margin: 0;
+    line-height: 1.6;
+}
+
+.dnd-video-embed {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    background: #000;
+}
+
+.dnd-video-embed iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+
+
+
+
+/* Editor Preview Styles */
+.dnd-listening-sessions-preview {
+    padding: 20px;
+    background: #f8f9fa;
+    border: 2px solid #007cba;
+    border-radius: 8px;
+}
+
+.dnd-listening-info {
+    background: white;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 15px 0;
+}
+
+.dnd-listening-info p {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.dnd-video-sample {
+    margin-top: 20px;
+}
+
+.dnd-video-card-preview {
+    max-width: 300px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.dnd-btn-preview {
+    padding: 8px 16px;
+    background: #ff0000;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .dnd-video-header {
+        padding: 15px;
+    }
+    
+    .dnd-video-title {
+        font-size: 18px;
+    }
+    
+    .dnd-video-metadata {
+        gap: 8px;
+    }
+    
+    .dnd-meta-item {
+        font-size: 12px;
+        padding: 4px 8px;
+    }
+}

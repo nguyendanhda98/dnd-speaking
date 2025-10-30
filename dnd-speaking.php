@@ -24,6 +24,7 @@ require_once plugin_dir_path(__FILE__) . 'blocks/feedback-block.php';
 // Autoload blocks
 require_once plugin_dir_path(__FILE__) . 'blocks/student-sessions-block.php';
 require_once plugin_dir_path(__FILE__) . 'blocks/discord-connect-block.php';
+require_once plugin_dir_path(__FILE__) . 'blocks/listening-sessions-block.php';
 
 // Activation / deactivation hooks
 register_activation_hook(__FILE__, ['DND_Speaking_Activator', 'activate']);

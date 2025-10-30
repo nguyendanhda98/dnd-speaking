@@ -21,6 +21,11 @@ class DND_Speaking_Admin {
         add_action('wp_ajax_save_teacher_youtube_url', [$this, 'save_teacher_youtube_url']);
         add_filter('pre_update_option_dnd_discord_bot_token', [$this, 'validate_discord_bot_token'], 10, 2);
         add_action('user_register', [$this, 'auto_assign_lessons_to_new_user']);
+        
+        // Listening Sessions AJAX handlers
+        add_action('admin_post_add_listening_session_admin', [$this, 'handle_add_listening_session']);
+        add_action('admin_post_edit_listening_session_admin', [$this, 'handle_edit_listening_session']);
+        add_action('admin_post_delete_listening_session_admin', [$this, 'handle_delete_listening_session']);
     }
 
     public function add_admin_menu() {
@@ -59,6 +64,15 @@ class DND_Speaking_Admin {
             'manage_options',
             'dnd-speaking-sessions',
             [$this, 'sessions_page']
+        );
+
+        add_submenu_page(
+            'dnd-speaking',
+            'Listening Sessions',
+            'Listening Sessions',
+            'manage_options',
+            'dnd-speaking-listening-sessions',
+            [$this, 'listening_sessions_page']
         );
 
         add_submenu_page(
@@ -2483,5 +2497,835 @@ class DND_Speaking_Admin {
         }
 
         wp_send_json_success('YouTube URL saved successfully');
+    }
+
+    /**
+     * Listening Sessions Admin Page
+     */
+    public function listening_sessions_page() {
+        global $wpdb;
+        
+        // Handle edit mode
+        $edit_mode = false;
+        $edit_session = null;
+        if (isset($_GET['action']) && $_GET['action'] === 'edit' && isset($_GET['id'])) {
+            $edit_mode = true;
+            $sessions = get_option('dnd_listening_sessions', []);
+            foreach ($sessions as $session) {
+                if ($session['id'] === $_GET['id']) {
+                    $edit_session = $session;
+                    break;
+                }
+            }
+        }
+        
+        // Get all sessions
+        $sessions = get_option('dnd_listening_sessions', []);
+        
+        // Get all teachers
+        $teachers = get_users(['role' => 'teacher']);
+        
+        // Get all students (users with credits)
+        $table = $wpdb->prefix . 'dnd_speaking_credits';
+        $students_query = $wpdb->get_results("SELECT DISTINCT user_id FROM $table ORDER BY user_id ASC");
+        $students = [];
+        foreach ($students_query as $row) {
+            $user = get_userdata($row->user_id);
+            if ($user) {
+                $students[] = $user;
+            }
+        }
+        
+        // Debug output
+        error_log('Listening Sessions - Total Teachers: ' . count($teachers));
+        error_log('Listening Sessions - Total Students: ' . count($students));
+        
+        ?>
+        <div class="wrap">
+            <h1>Quản Lý Listening Sessions</h1>
+            <p>Thêm các video YouTube mẫu để học viên có thể xem các buổi học với giáo viên.</p>
+            
+            <?php
+            // Display notices
+            if (isset($_GET['added'])) {
+                echo '<div class="notice notice-success is-dismissible"><p>✅ Đã thêm listening session thành công!</p></div>';
+            }
+            if (isset($_GET['updated'])) {
+                echo '<div class="notice notice-success is-dismissible"><p>✅ Đã cập nhật listening session thành công!</p></div>';
+            }
+            if (isset($_GET['deleted'])) {
+                echo '<div class="notice notice-success is-dismissible"><p>✅ Đã xóa listening session thành công!</p></div>';
+            }
+            if (isset($_GET['error'])) {
+                echo '<div class="notice notice-error is-dismissible"><p>❌ ' . esc_html($_GET['error']) . '</p></div>';
+            }
+            ?>
+            
+            <!-- Add/Edit Button -->
+            <?php if (!$edit_mode): ?>
+                <p>
+                    <button type="button" id="toggle-add-form-btn" class="button button-primary" onclick="toggleAddForm()">
+                        ➕ Thêm Listening Session Mới
+                    </button>
+                </p>
+            <?php endif; ?>
+            
+            <!-- Add/Edit Form -->
+            <div class="listening-session-form" id="listening-session-form" style="background: #fff; padding: 20px; margin: 20px 0; border: 1px solid #ccc; border-radius: 5px; <?php echo !$edit_mode ? 'display: none;' : ''; ?>">
+                <h2><?php echo $edit_mode ? 'Chỉnh Sửa Listening Session' : 'Thêm Listening Session Mới'; ?></h2>
+                <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" id="listening-session-main-form">
+                    <input type="hidden" name="action" value="<?php echo $edit_mode ? 'edit_listening_session_admin' : 'add_listening_session_admin'; ?>">
+                    <?php if ($edit_mode): ?>
+                        <input type="hidden" name="session_id" value="<?php echo esc_attr($edit_session['id']); ?>">
+                    <?php endif; ?>
+                    <?php wp_nonce_field('listening_session_nonce'); ?>
+                    
+                    <table class="form-table">
+                        <tr>
+                            <th><label for="video_title">Tiêu đề video <span style="color:red">*</span></label></th>
+                            <td>
+                                <input type="text" name="video_title" id="video_title" class="regular-text" 
+                                       value="<?php echo $edit_mode ? esc_attr($edit_session['title']) : ''; ?>" required>
+                                <p class="description">Ví dụ: "Buổi học với Teacher John - Chủ đề Travel"</p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th><label for="video_url">YouTube URL <span style="color:red">*</span></label></th>
+                            <td>
+                                <input type="url" name="video_url" id="video_url" class="regular-text" 
+                                       value="<?php echo $edit_mode ? esc_url($edit_session['url']) : ''; ?>" required>
+                                <p class="description">Ví dụ: https://www.youtube.com/watch?v=ABC123xyz hoặc https://youtu.be/ABC123xyz</p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th><label for="video_description">Mô tả</label></th>
+                            <td>
+                                <textarea name="video_description" id="video_description" class="large-text" rows="4"><?php echo $edit_mode ? esc_textarea($edit_session['description']) : ''; ?></textarea>
+                                <p class="description">Mô tả ngắn gọn về buổi học</p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th><label>Giáo viên <span style="color:red">*</span></label></th>
+                            <td>
+                                <!-- Hidden field to store selected teacher IDs -->
+                                <?php 
+                                $edit_teacher_ids = '';
+                                if ($edit_mode) {
+                                    if (isset($edit_session['teacher_ids'])) {
+                                        $edit_teacher_ids = implode(',', $edit_session['teacher_ids']);
+                                    } elseif (isset($edit_session['teacher_id'])) {
+                                        $edit_teacher_ids = $edit_session['teacher_id'];
+                                    }
+                                }
+                                ?>
+                                <input type="hidden" name="teacher_ids_hidden" id="teacher_ids_hidden" value="<?php echo esc_attr($edit_teacher_ids); ?>" required>
+                                
+                                <!-- Search Box -->
+                                <div style="margin-bottom: 10px;">
+                                    <input type="text" id="teacher_search" placeholder="Tìm kiếm giáo viên (nhập tên hoặc email)..." style="width: 100%; max-width: 500px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                </div>
+                                
+                                <!-- Search Results -->
+                                <div id="teacher_search_results" style="display: none; border: 1px solid #ddd; max-height: 200px; overflow-y: auto; width: 100%; max-width: 500px; background: white; margin-bottom: 10px; border-radius: 4px;">
+                                    <!-- Results will be populated here -->
+                                </div>
+                                
+                                <!-- Selected Teachers -->
+                                <div id="selected_teachers" style="border: 1px solid #ddd; min-height: 60px; max-height: 200px; overflow-y: auto; width: 100%; max-width: 500px; padding: 10px; background: #f9f9f9; border-radius: 4px;">
+                                    <div id="selected_teachers_list">
+                                        <?php 
+                                        $has_teachers = false;
+                                        if ($edit_mode): 
+                                            $teacher_ids_edit = isset($edit_session['teacher_ids']) ? $edit_session['teacher_ids'] : (isset($edit_session['teacher_id']) ? [$edit_session['teacher_id']] : []);
+                                            foreach ($teacher_ids_edit as $tid):
+                                                $teacher = get_userdata($tid);
+                                                if ($teacher):
+                                                    $has_teachers = true;
+                                        ?>
+                                            <span class="selected-tag teacher-tag">
+                                                <?php echo esc_html($teacher->display_name); ?>
+                                                <span class="remove-tag" onclick="removeTeacher(<?php echo $teacher->ID; ?>)">×</span>
+                                            </span>
+                                        <?php 
+                                                endif;
+                                            endforeach;
+                                        endif;
+                                        if (!$has_teachers):
+                                        ?>
+                                            <p style="color: #666; font-style: italic; margin: 0;">Chưa chọn giáo viên. Sử dụng ô tìm kiếm để thêm.</p>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <p class="description">Tìm kiếm và click vào giáo viên để thêm (có thể chọn nhiều)</p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th><label>Học viên <span style="color:red">*</span></label></th>
+                            <td>
+                                <!-- Hidden field to store selected student IDs -->
+                                <?php 
+                                $edit_student_ids = '';
+                                if ($edit_mode) {
+                                    if (isset($edit_session['student_ids'])) {
+                                        $edit_student_ids = implode(',', $edit_session['student_ids']);
+                                    } elseif (isset($edit_session['student_id'])) {
+                                        $edit_student_ids = $edit_session['student_id'];
+                                    }
+                                }
+                                ?>
+                                <input type="hidden" name="student_ids_hidden" id="student_ids_hidden" value="<?php echo esc_attr($edit_student_ids); ?>" required>
+                                
+                                <!-- Search Box -->
+                                <div style="margin-bottom: 10px;">
+                                    <input type="text" id="student_search_ls" placeholder="Tìm kiếm học viên (nhập tên hoặc email)..." style="width: 100%; max-width: 500px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                </div>
+                                
+                                <!-- Search Results -->
+                                <div id="student_search_results" style="display: none; border: 1px solid #ddd; max-height: 200px; overflow-y: auto; width: 100%; max-width: 500px; background: white; margin-bottom: 10px; border-radius: 4px;">
+                                    <!-- Results will be populated here -->
+                                </div>
+                                
+                                <!-- Selected Students -->
+                                <div id="selected_students_ls" style="border: 1px solid #ddd; min-height: 60px; max-height: 200px; overflow-y: auto; width: 100%; max-width: 500px; padding: 10px; background: #f9f9f9; border-radius: 4px;">
+                                    <div id="selected_students_list_ls">
+                                        <?php 
+                                        $has_students = false;
+                                        if ($edit_mode): 
+                                            $student_ids_edit = isset($edit_session['student_ids']) ? $edit_session['student_ids'] : (isset($edit_session['student_id']) ? [$edit_session['student_id']] : []);
+                                            foreach ($student_ids_edit as $sid):
+                                                $student = get_userdata($sid);
+                                                if ($student):
+                                                    $has_students = true;
+                                        ?>
+                                            <span class="selected-tag student-tag">
+                                                <?php echo esc_html($student->display_name); ?>
+                                                <span class="remove-tag" onclick="removeStudent(<?php echo $student->ID; ?>)">×</span>
+                                            </span>
+                                        <?php 
+                                                endif;
+                                            endforeach;
+                                        endif;
+                                        if (!$has_students):
+                                        ?>
+                                            <p style="color: #666; font-style: italic; margin: 0;">Chưa chọn học viên. Sử dụng ô tìm kiếm để thêm.</p>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <p class="description">Tìm kiếm và click vào học viên để thêm (có thể chọn nhiều)</p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th><label for="lesson_topic">Chủ đề bài học</label></th>
+                            <td>
+                                <input type="text" name="lesson_topic" id="lesson_topic" class="regular-text" 
+                                       value="<?php echo $edit_mode && isset($edit_session['lesson_topic']) ? esc_attr($edit_session['lesson_topic']) : ''; ?>">
+                                <p class="description">Ví dụ: Travel, Business English, Daily Conversation...</p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th><label for="video_duration">Thời lượng (phút)</label></th>
+                            <td>
+                                <input type="number" name="video_duration" id="video_duration" class="small-text" min="1" 
+                                       value="<?php echo $edit_mode && isset($edit_session['video_duration']) ? esc_attr($edit_session['video_duration']) : ''; ?>">
+                                <p class="description">Thời lượng video (tùy chọn)</p>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <p class="submit">
+                        <button type="submit" class="button button-primary">
+                            <?php echo $edit_mode ? '💾 Cập Nhật' : '➕ Thêm Listening Session'; ?>
+                        </button>
+                        <?php if ($edit_mode): ?>
+                            <a href="<?php echo admin_url('admin.php?page=dnd-speaking-listening-sessions'); ?>" class="button">Hủy</a>
+                        <?php else: ?>
+                            <button type="button" class="button" onclick="toggleAddForm()">Hủy</button>
+                        <?php endif; ?>
+                    </p>
+                </form>
+            </div>
+            
+            <!-- Sessions List -->
+            <h2>Danh Sách Listening Sessions (<?php echo count($sessions); ?>)</h2>
+            
+            <?php if (empty($sessions)): ?>
+                <p style="padding: 20px; background: #f0f0f0; text-align: center; font-style: italic;">
+                    Chưa có listening session nào. Hãy thêm mới ở form bên trên.
+                </p>
+            <?php else: ?>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Thumbnail</th>
+                            <th>Tiêu đề</th>
+                            <th>Giáo viên</th>
+                            <th>Học viên</th>
+                            <th>Chủ đề</th>
+                            <th style="width: 80px;">Thời lượng</th>
+                            <th style="width: 150px;">Ngày tạo</th>
+                            <th style="width: 150px;">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($sessions as $session): 
+                            $video_id = $this->extract_youtube_id($session['url']);
+                            $thumbnail = "https://img.youtube.com/vi/{$video_id}/default.jpg";
+                            
+                            // Get teacher IDs (support both old and new format)
+                            $teacher_ids = isset($session['teacher_ids']) ? $session['teacher_ids'] : (isset($session['teacher_id']) ? [$session['teacher_id']] : []);
+                            $session_teachers = [];
+                            foreach ($teacher_ids as $tid) {
+                                $teacher = get_userdata($tid);
+                                if ($teacher) $session_teachers[] = $teacher;
+                            }
+                            
+                            // Get student IDs (support both old and new format)
+                            $student_ids = isset($session['student_ids']) ? $session['student_ids'] : (isset($session['student_id']) ? [$session['student_id']] : []);
+                            $session_students = [];
+                            foreach ($student_ids as $sid) {
+                                $student = get_userdata($sid);
+                                if ($student) $session_students[] = $student;
+                            }
+                        ?>
+                            <tr>
+                                <td>
+                                    <a href="<?php echo esc_url($session['url']); ?>" target="_blank">
+                                        <img src="<?php echo esc_url($thumbnail); ?>" alt="Thumbnail" 
+                                             style="width: 100%; height: auto; border-radius: 4px;">
+                                    </a>
+                                </td>
+                                <td>
+                                    <strong><?php echo esc_html($session['title']); ?></strong>
+                                    <?php if (!empty($session['description'])): ?>
+                                        <br><small style="color: #666;"><?php echo esc_html($session['description']); ?></small>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if (!empty($session_teachers)): ?>
+                                        <?php foreach ($session_teachers as $teacher): ?>
+                                            <div style="margin-bottom: 5px;">
+                                                <?php echo esc_html($teacher->display_name); ?>
+                                                <br><small style="color: #666;"><?php echo esc_html($teacher->user_email); ?></small>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <em style="color: #999;">N/A</em>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if (!empty($session_students)): ?>
+                                        <?php foreach ($session_students as $student): ?>
+                                            <div style="margin-bottom: 5px;">
+                                                <?php echo esc_html($student->display_name); ?>
+                                                <br><small style="color: #666;"><?php echo esc_html($student->user_email); ?></small>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <em style="color: #999;">N/A</em>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php echo isset($session['lesson_topic']) && !empty($session['lesson_topic']) 
+                                        ? esc_html($session['lesson_topic']) 
+                                        : '<em style="color: #999;">-</em>'; ?>
+                                </td>
+                                <td>
+                                    <?php echo isset($session['video_duration']) && !empty($session['video_duration']) 
+                                        ? esc_html($session['video_duration']) . ' phút' 
+                                        : '<em style="color: #999;">-</em>'; ?>
+                                </td>
+                                <td>
+                                    <?php echo isset($session['created_at']) 
+                                        ? date('d/m/Y H:i', strtotime($session['created_at'])) 
+                                        : '<em style="color: #999;">N/A</em>'; ?>
+                                </td>
+                                <td>
+                                    <a href="<?php echo esc_url($session['url']); ?>" target="_blank" 
+                                       class="button button-small" title="Xem video">
+                                        👁️ Xem
+                                    </a>
+                                    <a href="<?php echo admin_url('admin.php?page=dnd-speaking-listening-sessions&action=edit&id=' . urlencode($session['id'])); ?>" 
+                                       class="button button-small" title="Chỉnh sửa">
+                                        ✏️ Sửa
+                                    </a>
+                                    <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" 
+                                          style="display: inline;" 
+                                          onsubmit="return confirm('Bạn có chắc chắn muốn xóa listening session này?');">
+                                        <input type="hidden" name="action" value="delete_listening_session_admin">
+                                        <input type="hidden" name="session_id" value="<?php echo esc_attr($session['id']); ?>">
+                                        <?php wp_nonce_field('listening_session_delete_nonce'); ?>
+                                        <button type="submit" class="button button-small" style="color: #dc3232;">
+                                            🗑️ Xóa
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
+        
+        <style>
+            .listening-session-form {
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .listening-session-form h2 {
+                margin-top: 0;
+                color: #333;
+            }
+            .wp-list-table th,
+            .wp-list-table td {
+                vertical-align: middle;
+            }
+            .wp-list-table img {
+                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            }
+            
+            /* Search result styles */
+            .search-result-item-ls {
+                padding: 10px;
+                cursor: pointer;
+                border-bottom: 1px solid #eee;
+                transition: background-color 0.2s;
+            }
+            .search-result-item-ls:hover {
+                background-color: #f0f0f0;
+            }
+            .search-result-item-ls:last-child {
+                border-bottom: none;
+            }
+            
+            /* Selected tag styles */
+            .selected-tag {
+                display: inline-block;
+                background: #0073aa;
+                color: white;
+                padding: 6px 12px;
+                margin: 4px;
+                border-radius: 4px;
+                font-size: 13px;
+                line-height: 1;
+            }
+            .teacher-tag {
+                background: #00a32a;
+            }
+            .student-tag {
+                background: #0073aa;
+            }
+            .remove-tag {
+                margin-left: 8px;
+                cursor: pointer;
+                font-weight: bold;
+                font-size: 16px;
+                opacity: 0.8;
+                transition: opacity 0.2s;
+            }
+            .remove-tag:hover {
+                opacity: 1;
+            }
+        </style>
+        
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Data arrays
+            var allTeachers = [
+                <?php
+                $teacher_data = [];
+                foreach ($teachers as $teacher) {
+                    $teacher_data[] = sprintf(
+                        '{id: %d, name: "%s", email: "%s"}',
+                        $teacher->ID,
+                        esc_js($teacher->display_name),
+                        esc_js($teacher->user_email)
+                    );
+                }
+                echo implode(",\n                ", $teacher_data);
+                ?>
+            ];
+            
+            var allStudentsLS = [
+                <?php
+                $student_data = [];
+                foreach ($students as $student) {
+                    $student_data[] = sprintf(
+                        '{id: %d, name: "%s", email: "%s"}',
+                        $student->ID,
+                        esc_js($student->display_name),
+                        esc_js($student->user_email)
+                    );
+                }
+                echo implode(",\n                ", $student_data);
+                ?>
+            ];
+            
+            var selectedTeachers = [];
+            var selectedStudentsLS = [];
+            
+            // Debug: Check if data is loaded
+            console.log('All Teachers:', allTeachers.length, allTeachers);
+            console.log('All Students:', allStudentsLS.length, allStudentsLS);
+            
+            // Initialize with existing data in edit mode
+            <?php if ($edit_mode): 
+                $teacher_ids_edit = isset($edit_session['teacher_ids']) ? $edit_session['teacher_ids'] : (isset($edit_session['teacher_id']) ? [$edit_session['teacher_id']] : []);
+                foreach ($teacher_ids_edit as $tid):
+            ?>
+                var existingTeacher = allTeachers.find(function(t) { return t.id === <?php echo intval($tid); ?>; });
+                if (existingTeacher) {
+                    selectedTeachers.push(existingTeacher);
+                }
+            <?php 
+                endforeach;
+            endif; ?>
+            
+            <?php if ($edit_mode): 
+                $student_ids_edit = isset($edit_session['student_ids']) ? $edit_session['student_ids'] : (isset($edit_session['student_id']) ? [$edit_session['student_id']] : []);
+                foreach ($student_ids_edit as $sid):
+            ?>
+                var existingStudent = allStudentsLS.find(function(s) { return s.id === <?php echo intval($sid); ?>; });
+                if (existingStudent) {
+                    selectedStudentsLS.push(existingStudent);
+                }
+            <?php 
+                endforeach;
+            endif; ?>
+            
+            // Teacher Search
+            $('#teacher_search').on('input', function() {
+                var searchTerm = $(this).val().toLowerCase().trim();
+                var resultsDiv = $('#teacher_search_results');
+                
+                if (searchTerm.length === 0) {
+                    resultsDiv.hide();
+                    return;
+                }
+                
+                var filtered = allTeachers.filter(function(teacher) {
+                    return teacher.name.toLowerCase().includes(searchTerm) || 
+                           teacher.email.toLowerCase().includes(searchTerm);
+                });
+                
+                if (filtered.length === 0) {
+                    resultsDiv.html('<div style="padding: 10px; color: #666;">Không tìm thấy giáo viên nào</div>').show();
+                } else {
+                    var html = '';
+                    filtered.forEach(function(teacher) {
+                        var isSelected = selectedTeachers.some(function(t) { return t.id === teacher.id; });
+                        var selectedClass = isSelected ? ' style="background: #e8f5e9; pointer-events: none; opacity: 0.6;"' : '';
+                        var selectedText = isSelected ? ' <span style="color: #4caf50; font-weight: bold;">(✓ Đã chọn)</span>' : '';
+                        
+                        html += '<div class="search-result-item-ls" data-teacher-id="' + teacher.id + '"' + selectedClass + '>' +
+                               '<strong>' + teacher.name + '</strong>' + selectedText + '<br>' +
+                               '<small style="color: #666;">' + teacher.email + '</small>' +
+                               '</div>';
+                    });
+                    
+                    resultsDiv.html(html);
+                    resultsDiv.show();
+                }
+            });
+            
+            // Student Search
+            $('#student_search_ls').on('input', function() {
+                var searchTerm = $(this).val().toLowerCase().trim();
+                var resultsDiv = $('#student_search_results');
+                
+                if (searchTerm.length === 0) {
+                    resultsDiv.hide();
+                    return;
+                }
+                
+                var filtered = allStudentsLS.filter(function(student) {
+                    return student.name.toLowerCase().includes(searchTerm) || 
+                           student.email.toLowerCase().includes(searchTerm);
+                });
+                
+                if (filtered.length === 0) {
+                    resultsDiv.html('<div style="padding: 10px; color: #666;">Không tìm thấy học viên nào</div>').show();
+                } else {
+                    var html = '';
+                    filtered.forEach(function(student) {
+                        var isSelected = selectedStudentsLS.some(function(s) { return s.id === student.id; });
+                        var selectedClass = isSelected ? ' style="background: #e8f5e9; pointer-events: none; opacity: 0.6;"' : '';
+                        var selectedText = isSelected ? ' <span style="color: #4caf50; font-weight: bold;">(✓ Đã chọn)</span>' : '';
+                        
+                        html += '<div class="search-result-item-ls" data-student-id="' + student.id + '"' + selectedClass + '>' +
+                               '<strong>' + student.name + '</strong>' + selectedText + '<br>' +
+                               '<small style="color: #666;">' + student.email + '</small>' +
+                               '</div>';
+                    });
+                    
+                    resultsDiv.html(html);
+                    resultsDiv.show();
+                }
+            });
+            
+            // Click handlers for search results
+            $(document).on('click', '[data-teacher-id]', function() {
+                var teacherId = parseInt($(this).data('teacher-id'));
+                var teacher = allTeachers.find(function(t) { return t.id === teacherId; });
+                if (teacher && !selectedTeachers.some(function(t) { return t.id === teacherId; })) {
+                    selectedTeachers.push(teacher);
+                    updateSelectedTeachers();
+                    $('#teacher_search').val('');
+                    $('#teacher_search_results').hide();
+                }
+            });
+            
+            $(document).on('click', '[data-student-id]', function() {
+                var studentId = parseInt($(this).data('student-id'));
+                var student = allStudentsLS.find(function(s) { return s.id === studentId; });
+                if (student && !selectedStudentsLS.some(function(s) { return s.id === studentId; })) {
+                    selectedStudentsLS.push(student);
+                    updateSelectedStudents();
+                    $('#student_search_ls').val('');
+                    $('#student_search_results').hide();
+                }
+            });
+            
+            // Hide search results when clicking outside
+            $(document).on('click', function(e) {
+                if (!$(e.target).closest('#teacher_search, #teacher_search_results').length) {
+                    $('#teacher_search_results').hide();
+                }
+                if (!$(e.target).closest('#student_search_ls, #student_search_results').length) {
+                    $('#student_search_results').hide();
+                }
+            });
+            
+            // Update selected teachers display
+            function updateSelectedTeachers() {
+                var listDiv = $('#selected_teachers_list');
+                var hiddenInput = $('#teacher_ids_hidden');
+                
+                if (selectedTeachers.length === 0) {
+                    listDiv.html('<p style="color: #666; font-style: italic; margin: 0;">Chưa chọn giáo viên. Sử dụng ô tìm kiếm để thêm.</p>');
+                    hiddenInput.val('');
+                } else {
+                    var html = '';
+                    var ids = [];
+                    selectedTeachers.forEach(function(teacher) {
+                        html += '<span class="selected-tag teacher-tag">' +
+                               teacher.name +
+                               '<span class="remove-tag" onclick="removeTeacher(' + teacher.id + ')">×</span>' +
+                               '</span>';
+                        ids.push(teacher.id);
+                    });
+                    listDiv.html(html);
+                    hiddenInput.val(ids.join(','));
+                }
+            }
+            
+            // Update selected students display
+            function updateSelectedStudents() {
+                var listDiv = $('#selected_students_list_ls');
+                var hiddenInput = $('#student_ids_hidden');
+                
+                if (selectedStudentsLS.length === 0) {
+                    listDiv.html('<p style="color: #666; font-style: italic; margin: 0;">Chưa chọn học viên. Sử dụng ô tìm kiếm để thêm.</p>');
+                    hiddenInput.val('');
+                } else {
+                    var html = '';
+                    var ids = [];
+                    selectedStudentsLS.forEach(function(student) {
+                        html += '<span class="selected-tag student-tag">' +
+                               student.name +
+                               '<span class="remove-tag" onclick="removeStudent(' + student.id + ')">×</span>' +
+                               '</span>';
+                        ids.push(student.id);
+                    });
+                    listDiv.html(html);
+                    hiddenInput.val(ids.join(','));
+                }
+            }
+            
+            // Remove teacher function (global scope)
+            window.removeTeacher = function(teacherId) {
+                selectedTeachers = selectedTeachers.filter(function(t) { return t.id !== teacherId; });
+                updateSelectedTeachers();
+            };
+            
+            // Remove student function (global scope)
+            window.removeStudent = function(studentId) {
+                selectedStudentsLS = selectedStudentsLS.filter(function(s) { return s.id !== studentId; });
+                updateSelectedStudents();
+            };
+            
+            // Initialize displays if in edit mode
+            <?php if ($edit_mode): ?>
+                updateSelectedTeachers();
+                updateSelectedStudents();
+            <?php endif; ?>
+            
+            // Toggle add form function (global scope)
+            window.toggleAddForm = function() {
+                var form = $('#listening-session-form');
+                var btn = $('#toggle-add-form-btn');
+                
+                if (form.is(':visible')) {
+                    form.slideUp();
+                    btn.text('➕ Thêm Listening Session Mới');
+                    // Reset form
+                    $('#listening-session-main-form')[0].reset();
+                    selectedTeachers = [];
+                    selectedStudentsLS = [];
+                    updateSelectedTeachers();
+                    updateSelectedStudents();
+                } else {
+                    form.slideDown();
+                    btn.text('❌ Đóng Form');
+                }
+            };
+        });
+        </script>
+        <?php
+    }
+
+    /**
+     * Handle Add Listening Session
+     */
+    public function handle_add_listening_session() {
+        check_admin_referer('listening_session_nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die('Bạn không có quyền thực hiện hành động này.');
+        }
+        
+        $title = sanitize_text_field($_POST['video_title']);
+        $url = esc_url_raw($_POST['video_url']);
+        $description = sanitize_textarea_field($_POST['video_description']);
+        $teacher_ids_string = sanitize_text_field($_POST['teacher_ids_hidden']);
+        $student_ids_string = sanitize_text_field($_POST['student_ids_hidden']);
+        $lesson_topic = sanitize_text_field($_POST['lesson_topic']);
+        $video_duration = intval($_POST['video_duration']);
+        
+        // Parse IDs
+        $teacher_ids = array_filter(array_map('intval', explode(',', $teacher_ids_string)));
+        $student_ids = array_filter(array_map('intval', explode(',', $student_ids_string)));
+        
+        // Validate
+        if (empty($title) || empty($url) || empty($teacher_ids) || empty($student_ids)) {
+            wp_redirect(add_query_arg('error', urlencode('Vui lòng điền đầy đủ thông tin bắt buộc'), admin_url('admin.php?page=dnd-speaking-listening-sessions')));
+            exit;
+        }
+        
+        // Validate YouTube URL
+        if (!preg_match('/(?:youtube\.com|youtu\.be)/', $url)) {
+            wp_redirect(add_query_arg('error', urlencode('URL không hợp lệ. Vui lòng nhập link YouTube'), admin_url('admin.php?page=dnd-speaking-listening-sessions')));
+            exit;
+        }
+        
+        $sessions = get_option('dnd_listening_sessions', []);
+        
+        $new_session = [
+            'id' => uniqid('video_'),
+            'title' => $title,
+            'url' => $url,
+            'description' => $description,
+            'teacher_ids' => $teacher_ids,
+            'student_ids' => $student_ids,
+            'teacher_id' => $teacher_ids[0], // Keep for backward compatibility
+            'student_id' => $student_ids[0], // Keep for backward compatibility
+            'lesson_topic' => $lesson_topic,
+            'video_duration' => $video_duration,
+            'created_at' => current_time('mysql'),
+        ];
+        
+        $sessions[] = $new_session;
+        update_option('dnd_listening_sessions', $sessions);
+        
+        wp_redirect(add_query_arg('added', '1', admin_url('admin.php?page=dnd-speaking-listening-sessions')));
+        exit;
+    }
+
+    /**
+     * Handle Edit Listening Session
+     */
+    public function handle_edit_listening_session() {
+        check_admin_referer('listening_session_nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die('Bạn không có quyền thực hiện hành động này.');
+        }
+        
+        $session_id = sanitize_text_field($_POST['session_id']);
+        $title = sanitize_text_field($_POST['video_title']);
+        $url = esc_url_raw($_POST['video_url']);
+        $description = sanitize_textarea_field($_POST['video_description']);
+        $teacher_ids_string = sanitize_text_field($_POST['teacher_ids_hidden']);
+        $student_ids_string = sanitize_text_field($_POST['student_ids_hidden']);
+        $lesson_topic = sanitize_text_field($_POST['lesson_topic']);
+        $video_duration = intval($_POST['video_duration']);
+        
+        // Parse IDs
+        $teacher_ids = array_filter(array_map('intval', explode(',', $teacher_ids_string)));
+        $student_ids = array_filter(array_map('intval', explode(',', $student_ids_string)));
+        
+        // Validate
+        if (empty($title) || empty($url) || empty($teacher_ids) || empty($student_ids)) {
+            wp_redirect(add_query_arg('error', urlencode('Vui lòng điền đầy đủ thông tin bắt buộc'), admin_url('admin.php?page=dnd-speaking-listening-sessions')));
+            exit;
+        }
+        
+        $sessions = get_option('dnd_listening_sessions', []);
+        
+        foreach ($sessions as &$session) {
+            if ($session['id'] === $session_id) {
+                $session['title'] = $title;
+                $session['url'] = $url;
+                $session['description'] = $description;
+                $session['teacher_ids'] = $teacher_ids;
+                $session['student_ids'] = $student_ids;
+                $session['teacher_id'] = $teacher_ids[0]; // Keep for backward compatibility
+                $session['student_id'] = $student_ids[0]; // Keep for backward compatibility
+                $session['lesson_topic'] = $lesson_topic;
+                $session['video_duration'] = $video_duration;
+                $session['updated_at'] = current_time('mysql');
+                break;
+            }
+        }
+        
+        update_option('dnd_listening_sessions', $sessions);
+        
+        wp_redirect(add_query_arg('updated', '1', admin_url('admin.php?page=dnd-speaking-listening-sessions')));
+        exit;
+    }
+
+    /**
+     * Handle Delete Listening Session
+     */
+    public function handle_delete_listening_session() {
+        check_admin_referer('listening_session_delete_nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die('Bạn không có quyền thực hiện hành động này.');
+        }
+        
+        $session_id = sanitize_text_field($_POST['session_id']);
+        $sessions = get_option('dnd_listening_sessions', []);
+        
+        $sessions = array_filter($sessions, function($session) use ($session_id) {
+            return $session['id'] !== $session_id;
+        });
+        
+        update_option('dnd_listening_sessions', array_values($sessions));
+        
+        wp_redirect(add_query_arg('deleted', '1', admin_url('admin.php?page=dnd-speaking-listening-sessions')));
+        exit;
+    }
+
+    /**
+     * Extract YouTube ID from URL
+     */
+    private function extract_youtube_id($url) {
+        preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i', $url, $matches);
+        return isset($matches[1]) ? $matches[1] : '';
     }
 }
