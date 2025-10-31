@@ -103,7 +103,6 @@ class DND_Speaking_Listening_Sessions_Block {
         
         foreach ($sessions as $session) {
             $video_id = $this->extract_youtube_id($session['url']);
-            $thumbnail = "https://img.youtube.com/vi/{$video_id}/maxresdefault.jpg";
             
             // Get teacher and student info (support both old and new format)
             $teacher_ids = isset($session['teacher_ids']) ? $session['teacher_ids'] : (isset($session['teacher_id']) ? [$session['teacher_id']] : []);
@@ -122,41 +121,46 @@ class DND_Speaking_Listening_Sessions_Block {
             
             $html .= '<div class="dnd-video-card" data-video-id="' . esc_attr($session['id']) . '">';
             
-            // Video header with title and metadata
-            $html .= '<div class="dnd-video-header">';
-            $html .= '<h3 class="dnd-video-title">' . esc_html($session['title']) . '</h3>';
-            
-            // Metadata row
-            $html .= '<div class="dnd-video-metadata">';
-            if (!empty($teachers)) {
-                $teacher_names = array_map(function($t) { return esc_html($t->display_name); }, $teachers);
-                $html .= '<span class="dnd-meta-item">👨‍🏫 ' . implode(', ', $teacher_names) . '</span>';
-            }
-            if (!empty($students)) {
-                $student_names = array_map(function($s) { return esc_html($s->display_name); }, $students);
-                $html .= '<span class="dnd-meta-item">👨‍🎓 ' . implode(', ', $student_names) . '</span>';
-            }
-            if (!empty($session['lesson_topic'])) {
-                $html .= '<span class="dnd-meta-item">📚 ' . esc_html($session['lesson_topic']) . '</span>';
-            }
-            if (!empty($session['video_duration'])) {
-                $html .= '<span class="dnd-meta-item">⏱️ ' . esc_html($session['video_duration']) . ' phút</span>';
-            }
-            $html .= '</div>';
-            
-            if (!empty($session['description'])) {
-                $html .= '<p class="dnd-video-description">' . esc_html($session['description']) . '</p>';
-            }
-            $html .= '</div>';
-            
-            // Embedded YouTube iframe
+            // Embedded YouTube iframe - First element, full width
             $html .= '<div class="dnd-video-embed">';
-            $html .= '<iframe width="100%" height="100%" src="https://www.youtube.com/embed/' . esc_attr($video_id) . '" ';
+            $html .= '<iframe src="https://www.youtube.com/embed/' . esc_attr($video_id) . '" ';
             $html .= 'frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" ';
             $html .= 'allowfullscreen></iframe>';
             $html .= '</div>';
             
-            $html .= '</div>';
+            // Video info below video
+            $html .= '<div class="dnd-video-info">';
+            
+            // Title
+            $html .= '<h3 class="dnd-video-title">' . esc_html($session['title']) . '</h3>';
+            
+            // Teachers
+            if (!empty($teachers)) {
+                $html .= '<div class="dnd-video-meta-line">';
+                $html .= '<span class="dnd-meta-label">Giáo viên:</span> ';
+                $teacher_links = [];
+                foreach ($teachers as $teacher) {
+                    $teacher_links[] = '<a href="#" class="dnd-profile-link" data-user-id="' . esc_attr($teacher->ID) . '">' . esc_html($teacher->display_name) . '</a>';
+                }
+                $html .= implode(', ', $teacher_links);
+                $html .= '</div>';
+            }
+            
+            // Students
+            if (!empty($students)) {
+                $html .= '<div class="dnd-video-meta-line">';
+                $html .= '<span class="dnd-meta-label">Học viên:</span> ';
+                $student_links = [];
+                foreach ($students as $student) {
+                    $student_links[] = '<a href="#" class="dnd-profile-link" data-user-id="' . esc_attr($student->ID) . '">' . esc_html($student->display_name) . '</a>';
+                }
+                $html .= implode(', ', $student_links);
+                $html .= '</div>';
+            }
+            
+            $html .= '</div>'; // End video-info
+            
+            $html .= '</div>'; // End video-card
         }
         
         $html .= '</div>';

@@ -117,62 +117,32 @@
 }
 
 .dnd-videos-grid {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 30px;
 }
 
 .dnd-video-card {
     background: #fff;
     border: 1px solid #ddd;
-    border-radius: 8px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
 }
 
-.dnd-video-header {
-    padding: 20px;
-    background: #f8f9fa;
-    border-bottom: 1px solid #ddd;
+.dnd-video-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
 }
 
-.dnd-video-title {
-    font-size: 20px;
-    font-weight: 600;
-    color: #333;
-    margin: 0 0 12px 0;
-    line-height: 1.4;
-}
-
-.dnd-video-metadata {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    margin-bottom: 12px;
-}
-
-.dnd-meta-item {
-    display: inline-flex;
-    align-items: center;
-    font-size: 14px;
-    color: #666;
-    background: #fff;
-    padding: 6px 12px;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-}
-
-.dnd-video-description {
-    font-size: 14px;
-    color: #666;
-    margin: 0;
-    line-height: 1.6;
-}
-
+/* Video embed - Full width at top */
 .dnd-video-embed {
     position: relative;
     width: 100%;
     padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    height: 0;
+    overflow: hidden;
     background: #000;
 }
 
@@ -182,6 +152,44 @@
     left: 0;
     width: 100%;
     height: 100%;
+    border: 0;
+    object-fit: cover;
+}
+
+/* Video info section below video */
+.dnd-video-info {
+    padding: 20px;
+}
+
+.dnd-video-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 15px 0;
+    line-height: 1.4;
+}
+
+.dnd-video-meta-line {
+    font-size: 14px;
+    color: #666;
+    margin: 8px 0;
+    line-height: 1.6;
+}
+
+.dnd-meta-label {
+    font-weight: 600;
+    color: #333;
+}
+
+.dnd-profile-link {
+    color: #007cba;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.dnd-profile-link:hover {
+    color: #005a87;
+    text-decoration: underline;
 }
 
 
@@ -231,21 +239,32 @@
 }
 
 /* Responsive */
+
+/* Tablet: 2 columns */
+@media (max-width: 1024px) {
+    .dnd-videos-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+}
+
+/* Mobile: 1 column */
 @media (max-width: 768px) {
-    .dnd-video-header {
+    .dnd-videos-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .dnd-video-info {
         padding: 15px;
     }
     
     .dnd-video-title {
-        font-size: 18px;
+        font-size: 16px;
+        margin-bottom: 12px;
     }
     
-    .dnd-video-metadata {
-        gap: 8px;
-    }
-    
-    .dnd-meta-item {
-        font-size: 12px;
-        padding: 4px 8px;
+    .dnd-video-meta-line {
+        font-size: 13px;
     }
 }
