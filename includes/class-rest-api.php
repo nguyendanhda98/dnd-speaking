@@ -375,7 +375,7 @@ class DND_Speaking_REST_API {
         return ['credits' => $credits];
     }
 
-    public function get_teachers() {
+    public function get_teachers($request = null) {
         $teacher_role = get_option('dnd_teacher_role', 'teacher');
         $users = get_users(['role' => $teacher_role]);
 
@@ -393,6 +393,22 @@ class DND_Speaking_REST_API {
             ];
         }
 
+        // Get filter parameters
+        $filter_days = [];
+        $filter_start_time = null;
+        $filter_end_time = null;
+        
+        if ($request) {
+            $filter_days_param = $request->get_param('days');
+            if ($filter_days_param && is_array($filter_days_param)) {
+                $filter_days = $filter_days_param;
+            }
+            $filter_start_time = $request->get_param('start_time');
+            $filter_end_time = $request->get_param('end_time');
+        }
+
+        $has_filter = !empty($filter_days) || ($filter_start_time && $filter_end_time);
+
         $teachers = [];
         foreach ($users as $user) {
             $available_status = get_user_meta($user->ID, 'dnd_available', true);
@@ -407,16 +423,29 @@ class DND_Speaking_REST_API {
                     $youtube_video_id = $matches[1];
                 }
             }
-            
-            // Return status: '1' = online, 'busy' = busy, '' or other = offline
-            $teachers[] = [
-                'id' => $user->ID,
-                'name' => $user->display_name,
-                'available' => $available_status === '1',
-                'status' => $available_status, // Return raw status for frontend display
-                'youtube_url' => $youtube_url,
-                'youtube_video_id' => $youtube_video_id,
-            ];
+
+            // Apply availability filter if specified
+            $matches_filter = true;
+            if ($has_filter) {
+                $matches_filter = $this->teacher_matches_availability_filter(
+                    $user->ID, 
+                    $filter_days, 
+                    $filter_start_time, 
+                    $filter_end_time
+                );
+            }
+
+            if ($matches_filter) {
+                // Return status: '1' = online, 'busy' = busy, '' or other = offline
+                $teachers[] = [
+                    'id' => $user->ID,
+                    'name' => $user->display_name,
+                    'available' => $available_status === '1',
+                    'status' => $available_status, // Return raw status for frontend display
+                    'youtube_url' => $youtube_url,
+                    'youtube_video_id' => $youtube_video_id,
+                ];
+            }
         }
 
         // Sort teachers: online first, then busy, then offline
@@ -428,6 +457,72 @@ class DND_Speaking_REST_API {
         });
 
         return $teachers;
+    }
+
+    private function teacher_matches_availability_filter($teacher_id, $filter_days, $filter_start_time, $filter_end_time) {
+        // Get teacher's weekly schedule
+        $weekly_schedule = get_user_meta($teacher_id, 'dnd_weekly_schedule', true);
+        
+        if (!$weekly_schedule || !is_array($weekly_schedule)) {
+            return false; // No schedule set
+        }
+
+        $day_mapping = [
+            'monday' => 1,
+            'tuesday' => 2,
+            'wednesday' => 3,
+            'thursday' => 4,
+            'friday' => 5,
+            'saturday' => 6,
+            'sunday' => 7
+        ];
+
+        // Check if teacher is available on any of the filtered days
+        $has_matching_day = false;
+        foreach ($filter_days as $filter_day) {
+            if (isset($weekly_schedule[$filter_day]) && 
+                isset($weekly_schedule[$filter_day]['enabled']) && 
+                $weekly_schedule[$filter_day]['enabled']) {
+                
+                // If no time filter is specified, just check if the day is available
+                if (!$filter_start_time || !$filter_end_time) {
+                    $has_matching_day = true;
+                    break;
+                }
+
+                // Check if the teacher's schedule on this day overlaps with the filter time range
+                $day_data = $weekly_schedule[$filter_day];
+                
+                // Handle both old format (start/end) and new format (time_slots)
+                $time_slots = [];
+                if (isset($day_data['time_slots']) && is_array($day_data['time_slots'])) {
+                    $time_slots = $day_data['time_slots'];
+                } elseif (isset($day_data['start']) && isset($day_data['end'])) {
+                    $time_slots = [['start' => $day_data['start'], 'end' => $day_data['end']]];
+                }
+
+                foreach ($time_slots as $slot) {
+                    if (!isset($slot['start']) || !isset($slot['end'])) {
+                        continue;
+                    }
+
+                    // Check if filter time range overlaps with this slot
+                    // Convert times to comparable format (remove colons for simple comparison)
+                    $slot_start = str_replace(':', '', $slot['start']);
+                    $slot_end = str_replace(':', '', $slot['end']);
+                    $filter_start = str_replace(':', '', $filter_start_time);
+                    $filter_end = str_replace(':', '', $filter_end_time);
+
+                    // Check overlap: filter_start < slot_end AND filter_end > slot_start
+                    if ($filter_start < $slot_end && $filter_end > $slot_start) {
+                        $has_matching_day = true;
+                        break 2; // Break both loops
+                    }
+                }
+            }
+        }
+
+        return $has_matching_day;
     }
 
     public function start_session($request) {

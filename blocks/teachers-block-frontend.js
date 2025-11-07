@@ -9,6 +9,84 @@ jQuery(document).ready(function($) {
         return;
     }
 
+    // Function to load teachers with optional filters
+    function loadTeachers(filters = {}) {
+        let url = dnd_speaking_data.rest_url + 'teachers';
+        
+        // Build query parameters if filters are provided
+        if (filters.days && filters.days.length > 0) {
+            url += '?' + filters.days.map((day, index) => `days[${index}]=${day}`).join('&');
+            if (filters.start_time && filters.end_time) {
+                url += `&start_time=${filters.start_time}&end_time=${filters.end_time}`;
+            }
+        }
+
+        $.ajax({
+            url: url,
+            method: 'GET',
+            headers: {
+                'X-WP-Nonce': dnd_speaking_data.nonce
+            },
+            success: function(teachers) {
+                console.log('Teachers loaded:', teachers);
+                if (teachers.length === 0) {
+                    $teachersList.html('<p class="dnd-no-results">Không tìm thấy giáo viên phù hợp với bộ lọc.</p>');
+                } else {
+                    renderTeachers(teachers);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading teachers:', xhr.responseText, status, error);
+                $teachersList.html('<p>Unable to load teachers. Please check console for details.</p>');
+            }
+        });
+    }
+
+    // Handle filter apply button
+    $('#dnd-apply-filter').on('click', function() {
+        const selectedDays = [];
+        $('.dnd-day-input:checked').each(function() {
+            selectedDays.push($(this).val());
+        });
+
+        const startTime = $('#dnd-start-time').val();
+        const endTime = $('#dnd-end-time').val();
+
+        // Validate time range
+        if (selectedDays.length > 0 && startTime && endTime) {
+            if (startTime >= endTime) {
+                alert('Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc!');
+                return;
+            }
+        }
+
+        // Apply filters
+        const filters = {};
+        if (selectedDays.length > 0) {
+            filters.days = selectedDays;
+            filters.start_time = startTime;
+            filters.end_time = endTime;
+        }
+
+        loadTeachers(filters);
+    });
+
+    // Handle filter reset button
+    $('#dnd-reset-filter').on('click', function() {
+        // Uncheck all day checkboxes
+        $('.dnd-day-input').prop('checked', false);
+        
+        // Reset time selectors to default
+        $('#dnd-start-time').val('00:00');
+        $('#dnd-end-time').val('23:30');
+        
+        // Load all teachers without filters
+        loadTeachers();
+    });
+
+    // Initial load of teachers
+    loadTeachers();
+
     // Bind book now event handler immediately
     $(document).on('click', '.dnd-btn-book', function(e) {
         e.preventDefault();
@@ -47,23 +125,6 @@ jQuery(document).ready(function($) {
             $button.html(originalHtml);
         });
         return false;
-    });
-
-    // Fetch teachers
-    $.ajax({
-        url: dnd_speaking_data.rest_url + 'teachers',
-        method: 'GET',
-        headers: {
-            'X-WP-Nonce': dnd_speaking_data.nonce
-        },
-        success: function(teachers) {
-            console.log('Teachers loaded:', teachers); // Debug log
-            renderTeachers(teachers);
-        },
-        error: function(xhr, status, error) {
-            console.error('Error loading teachers:', xhr.responseText, status, error); // Debug log
-            $teachersList.html('<p>Unable to load teachers. Please check console for details.</p>');
-        }
     });
 
     function renderTeachers(teachers) {

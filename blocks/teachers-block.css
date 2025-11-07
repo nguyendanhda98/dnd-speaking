@@ -4,6 +4,163 @@
     margin: 0 auto;
 }
 
+/* Filter Section Styles */
+.dnd-teachers-filter {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.dnd-filter-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    color: #333;
+}
+
+.dnd-filter-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.dnd-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dnd-filter-label {
+    font-weight: 600;
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 5px;
+    display: block;
+}
+
+/* Days Selector Styles */
+.dnd-days-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dnd-day-checkbox {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.dnd-day-checkbox input[type="checkbox"] {
+    display: none;
+}
+
+.dnd-day-label {
+    padding: 8px 16px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s;
+    color: #555;
+}
+
+.dnd-day-checkbox:hover .dnd-day-label {
+    border-color: #007cba;
+    background: #f0f8ff;
+}
+
+.dnd-day-checkbox input[type="checkbox"]:checked + .dnd-day-label {
+    background: #007cba;
+    border-color: #007cba;
+    color: white;
+}
+
+/* Time Range Selector Styles */
+.dnd-time-group {
+    flex-direction: row;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.dnd-time-picker {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dnd-time-select {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.3s;
+}
+
+.dnd-time-select:hover,
+.dnd-time-select:focus {
+    border-color: #007cba;
+    outline: none;
+}
+
+/* Filter Buttons */
+.dnd-filter-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.dnd-btn-primary {
+    background: #007cba;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.dnd-btn-primary:hover {
+    background: #005a87;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 124, 186, 0.3);
+}
+
+.dnd-btn-secondary {
+    background: #6c757d;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.dnd-btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+/* No Results Message */
+.dnd-no-results {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+    font-size: 16px;
+}
+
 .dnd-teachers-list {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -331,6 +488,38 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+    .dnd-teachers-filter {
+        padding: 15px;
+    }
+    
+    .dnd-filter-title {
+        font-size: 18px;
+        margin-bottom: 15px;
+    }
+    
+    .dnd-time-group {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .dnd-days-selector {
+        gap: 8px;
+    }
+    
+    .dnd-day-label {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+    
+    .dnd-filter-buttons {
+        flex-direction: column;
+    }
+    
+    .dnd-btn-primary,
+    .dnd-btn-secondary {
+        width: 100%;
+    }
+    
     .dnd-teachers-list {
         grid-template-columns: 1fr;
         gap: 20px;
