@@ -100,16 +100,12 @@ class DND_Speaking_Teachers_Block {
         // Time range selectors
         $output .= '<div class="dnd-filter-item">';
         $output .= '<label class="dnd-filter-label">Từ giờ:</label>';
-        $output .= '<select id="dnd-start-time" class="dnd-select">';
-        $output .= $this->generate_time_options();
-        $output .= '</select>';
+        $output .= '<input type="time" id="dnd-start-time" class="dnd-time-input" value="00:00" />';
         $output .= '</div>';
         
         $output .= '<div class="dnd-filter-item">';
         $output .= '<label class="dnd-filter-label">Đến giờ:</label>';
-        $output .= '<select id="dnd-end-time" class="dnd-select">';
-        $output .= $this->generate_time_options('23:30');
-        $output .= '</select>';
+        $output .= '<input type="time" id="dnd-end-time" class="dnd-time-input" value="23:30" />';
         $output .= '</div>';
         
         // Filter buttons

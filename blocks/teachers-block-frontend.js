@@ -11,6 +11,9 @@ jQuery(document).ready(function($) {
 
     // Function to load teachers with optional filters
     function loadTeachers(filters = {}) {
+        // Show loading message
+        $teachersList.html('<p class="dnd-loading-teachers">Đang tìm giáo viên...</p>');
+        
         let url = dnd_speaking_data.rest_url + 'teachers';
         
         // Build query parameters if filters are provided

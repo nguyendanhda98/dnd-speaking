@@ -37,8 +37,9 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
-    flex: 1;
-    min-width: 150px;
+    flex: 0 1 auto;
+    min-width: 120px;
+    max-width: 200px;
 }
 
 .dnd-filter-label {
@@ -46,6 +47,7 @@
     font-size: 13px;
     color: #555;
     display: block;
+    white-space: nowrap;
 }
 
 /* Select Dropdowns */
@@ -62,6 +64,26 @@
 
 .dnd-select:hover,
 .dnd-select:focus {
+    border-color: #007cba;
+    outline: none;
+    box-shadow: 0 0 0 1px #007cba;
+}
+
+/* Time Input */
+.dnd-time-input {
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.3s;
+    width: 140px;
+    box-sizing: border-box;
+}
+
+.dnd-time-input:hover,
+.dnd-time-input:focus {
     border-color: #007cba;
     outline: none;
     box-shadow: 0 0 0 1px #007cba;
@@ -117,6 +139,25 @@
     padding: 40px 20px;
     color: #6c757d;
     font-size: 16px;
+}
+
+/* Loading Teachers Message */
+.dnd-loading-teachers {
+    text-align: center;
+    padding: 40px 20px;
+    color: #007bff;
+    font-size: 16px;
+    font-weight: 500;
+    animation: dnd-fade-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dnd-fade-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
 }
 
 .dnd-teachers-list {
