@@ -8,8 +8,15 @@
 
 if (!defined('ABSPATH')) exit;
 
-// Autoload includes
+// Load Discord notifications first (required by email notifications)
+require_once plugin_dir_path(__FILE__) . 'includes/class-discord-notifications.php';
+
+// Autoload other includes
 foreach (glob(plugin_dir_path(__FILE__) . 'includes/*.php') as $file) {
+    // Skip if already loaded
+    if (basename($file) === 'class-discord-notifications.php') {
+        continue;
+    }
     require_once $file;
 }
 

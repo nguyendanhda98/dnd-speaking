@@ -8,10 +8,17 @@
 class DND_Speaking_Email_Notifications {
 
     /**
+     * Discord notifications instance
+     */
+    private $discord_notifications;
+
+    /**
      * Initialize the email notifications
      */
     public function __construct() {
         // No hooks needed here, we'll call methods directly from REST API
+        // Initialize Discord notifications
+        $this->discord_notifications = new DND_Speaking_Discord_Notifications();
     }
 
     /**
@@ -57,6 +64,8 @@ class DND_Speaking_Email_Notifications {
         
         if ($sent) {
             error_log('EMAIL NOTIFICATION - Sent booking notification to teacher ' . $teacher_id . ' (' . $teacher_email . ')');
+            // Also send Discord DM notification
+            $this->discord_notifications->notify_teacher_new_booking($session_id, $student_id, $teacher_id, $start_time);
         } else {
             error_log('EMAIL NOTIFICATION - Failed to send booking notification to teacher ' . $teacher_id);
         }
@@ -107,6 +116,8 @@ class DND_Speaking_Email_Notifications {
         
         if ($sent) {
             error_log('EMAIL NOTIFICATION - Sent cancellation notification to teacher ' . $teacher_id . ' (' . $teacher_email . ')');
+            // Also send Discord DM notification
+            $this->discord_notifications->notify_teacher_student_cancelled($session_id, $student_id, $teacher_id, $start_time, $session_status);
         } else {
             error_log('EMAIL NOTIFICATION - Failed to send cancellation notification to teacher ' . $teacher_id);
         }
@@ -158,6 +169,8 @@ class DND_Speaking_Email_Notifications {
         
         if ($sent) {
             error_log('EMAIL NOTIFICATION - Sent confirmation notification to student ' . $student_id . ' (' . $student_email . ')');
+            // Also send Discord DM notification
+            $this->discord_notifications->notify_student_session_confirmed($session_id, $student_id, $teacher_id, $start_time);
         } else {
             error_log('EMAIL NOTIFICATION - Failed to send confirmation notification to student ' . $student_id);
         }
@@ -210,6 +223,8 @@ class DND_Speaking_Email_Notifications {
         
         if ($sent) {
             error_log('EMAIL NOTIFICATION - Sent teacher cancellation notification to student ' . $student_id . ' (' . $student_email . ')');
+            // Also send Discord DM notification
+            $this->discord_notifications->notify_student_teacher_cancelled($session_id, $student_id, $teacher_id, $start_time, $session_status);
         } else {
             error_log('EMAIL NOTIFICATION - Failed to send teacher cancellation notification to student ' . $student_id);
         }
@@ -255,6 +270,8 @@ class DND_Speaking_Email_Notifications {
         
         if ($sent) {
             error_log('EMAIL NOTIFICATION - Sent session start notification to student ' . $student_id . ' (' . $student_email . ')');
+            // Also send Discord DM notification
+            $this->discord_notifications->notify_student_session_started($session_id, $student_id, $teacher_id, $room_link);
         } else {
             error_log('EMAIL NOTIFICATION - Failed to send session start notification to student ' . $student_id);
         }
