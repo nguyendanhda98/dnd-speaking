@@ -74,10 +74,14 @@ class DND_Speaking_Teachers_Block {
         $output .= '<h3 class="dnd-filter-title">Lọc theo thời gian rảnh</h3>';
         $output .= '<div class="dnd-filter-controls">';
         
-        // Day of week selector with multiple selection
-        $output .= '<div class="dnd-filter-group">';
-        $output .= '<label class="dnd-filter-label">Chọn thứ trong tuần:</label>';
-        $output .= '<div class="dnd-days-selector">';
+        // Single row with all 3 controls
+        $output .= '<div class="dnd-filter-row">';
+        
+        // Day of week dropdown (single selection)
+        $output .= '<div class="dnd-filter-item">';
+        $output .= '<label class="dnd-filter-label">Thứ:</label>';
+        $output .= '<select id="dnd-day-select" class="dnd-select">';
+        $output .= '<option value="">Tất cả các thứ</option>';
         $days = [
             'monday' => 'Thứ 2',
             'tuesday' => 'Thứ 3',
@@ -88,37 +92,33 @@ class DND_Speaking_Teachers_Block {
             'sunday' => 'Chủ nhật'
         ];
         foreach ($days as $value => $label) {
-            $output .= '<label class="dnd-day-checkbox">';
-            $output .= '<input type="checkbox" name="day_of_week[]" value="' . $value . '" class="dnd-day-input">';
-            $output .= '<span class="dnd-day-label">' . $label . '</span>';
-            $output .= '</label>';
+            $output .= '<option value="' . $value . '">' . $label . '</option>';
         }
-        $output .= '</div>';
+        $output .= '</select>';
         $output .= '</div>';
         
         // Time range selectors
-        $output .= '<div class="dnd-filter-group dnd-time-group">';
-        $output .= '<div class="dnd-time-picker">';
+        $output .= '<div class="dnd-filter-item">';
         $output .= '<label class="dnd-filter-label">Từ giờ:</label>';
-        $output .= '<select id="dnd-start-time" class="dnd-time-select">';
+        $output .= '<select id="dnd-start-time" class="dnd-select">';
         $output .= $this->generate_time_options();
         $output .= '</select>';
         $output .= '</div>';
         
-        $output .= '<div class="dnd-time-picker">';
+        $output .= '<div class="dnd-filter-item">';
         $output .= '<label class="dnd-filter-label">Đến giờ:</label>';
-        $output .= '<select id="dnd-end-time" class="dnd-time-select">';
+        $output .= '<select id="dnd-end-time" class="dnd-select">';
         $output .= $this->generate_time_options('23:30');
         $output .= '</select>';
         $output .= '</div>';
-        $output .= '</div>';
         
         // Filter buttons
-        $output .= '<div class="dnd-filter-buttons">';
-        $output .= '<button type="button" id="dnd-apply-filter" class="dnd-btn dnd-btn-primary">Áp dụng lọc</button>';
-        $output .= '<button type="button" id="dnd-reset-filter" class="dnd-btn dnd-btn-secondary">Xóa bộ lọc</button>';
+        $output .= '<div class="dnd-filter-item dnd-filter-actions">';
+        $output .= '<button type="button" id="dnd-apply-filter" class="dnd-btn dnd-btn-primary">Lọc</button>';
+        $output .= '<button type="button" id="dnd-reset-filter" class="dnd-btn dnd-btn-secondary">Xóa</button>';
         $output .= '</div>';
         
+        $output .= '</div>'; // .dnd-filter-row
         $output .= '</div>'; // .dnd-filter-controls
         $output .= '</div>'; // .dnd-teachers-filter
         

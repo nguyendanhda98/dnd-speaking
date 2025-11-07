@@ -44,37 +44,33 @@ jQuery(document).ready(function($) {
 
     // Handle filter apply button
     $('#dnd-apply-filter').on('click', function() {
-        const selectedDays = [];
-        $('.dnd-day-input:checked').each(function() {
-            selectedDays.push($(this).val());
-        });
-
+        const selectedDay = $('#dnd-day-select').val();
         const startTime = $('#dnd-start-time').val();
         const endTime = $('#dnd-end-time').val();
 
         // Validate time range
-        if (selectedDays.length > 0 && startTime && endTime) {
-            if (startTime >= endTime) {
-                alert('Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc!');
-                return;
-            }
+        if (startTime && endTime && startTime >= endTime) {
+            alert('Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc!');
+            return;
         }
 
         // Apply filters
         const filters = {};
-        if (selectedDays.length > 0) {
-            filters.days = selectedDays;
+        if (selectedDay) {
+            // If day is selected, add to filters array
+            filters.days = [selectedDay];
             filters.start_time = startTime;
             filters.end_time = endTime;
         }
+        // If no day selected, filters will be empty = show all teachers
 
         loadTeachers(filters);
     });
 
     // Handle filter reset button
     $('#dnd-reset-filter').on('click', function() {
-        // Uncheck all day checkboxes
-        $('.dnd-day-input').prop('checked', false);
+        // Reset day dropdown
+        $('#dnd-day-select').val('');
         
         // Reset time selectors to default
         $('#dnd-start-time').val('00:00');
