@@ -69,8 +69,16 @@ class DND_Speaking_Teachers_Block {
 
         $output = '<div class="dnd-teachers-block">';
         
-        // Add filter section
-        $output .= '<div class="dnd-teachers-filter">';
+        // Add filter toggle button
+        $output .= '<button type="button" id="dnd-filter-toggle" class="dnd-filter-toggle-btn">';
+        $output .= '<svg class="dnd-filter-icon" viewBox="0 0 24 24" fill="currentColor">';
+        $output .= '<path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/>';
+        $output .= '</svg>';
+        $output .= ' Lọc giáo viên';
+        $output .= '</button>';
+        
+        // Add filter section (hidden by default)
+        $output .= '<div class="dnd-teachers-filter" style="display: none;">';
         $output .= '<h3 class="dnd-filter-title">Lọc theo thời gian rảnh</h3>';
         $output .= '<div class="dnd-filter-controls">';
         

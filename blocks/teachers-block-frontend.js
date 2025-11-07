@@ -45,6 +45,22 @@ jQuery(document).ready(function($) {
         });
     }
 
+    // Handle filter toggle button
+    $('#dnd-filter-toggle').on('click', function() {
+        const $filterSection = $('.dnd-teachers-filter');
+        const $toggleBtn = $(this);
+        
+        if ($filterSection.is(':visible')) {
+            // Hide filter section
+            $filterSection.slideUp(300);
+            $toggleBtn.removeClass('active');
+        } else {
+            // Show filter section
+            $filterSection.slideDown(300);
+            $toggleBtn.addClass('active');
+        }
+    });
+
     // Handle filter apply button
     $('#dnd-apply-filter').on('click', function() {
         const selectedDay = $('#dnd-day-select').val();
@@ -78,6 +94,10 @@ jQuery(document).ready(function($) {
         // Reset time selectors to default
         $('#dnd-start-time').val('00:00');
         $('#dnd-end-time').val('23:30');
+        
+        // Hide filter section
+        $('.dnd-teachers-filter').slideUp(300);
+        $('#dnd-filter-toggle').removeClass('active');
         
         // Load all teachers without filters
         loadTeachers();
